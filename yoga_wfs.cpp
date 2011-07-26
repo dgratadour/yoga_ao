@@ -7,7 +7,7 @@
   fill bimage with noise
   add binned pixels from cturbim to bimage
  */
-yoga_wfs::yoga_wfs(long nxsub, long nvalid, long npix, long nphase, long nrebin, long nfft, long ntot, long npup)
+yoga_wfs::yoga_wfs(long nxsub, long nvalid, long npix, long nphase, long nrebin, long nfft, long ntot, long npup, int lgs)
 {
   this->nxsub  = nxsub;
   this->nvalid = nvalid;
@@ -17,6 +17,7 @@ yoga_wfs::yoga_wfs(long nxsub, long nvalid, long npix, long nphase, long nrebin,
   this->nfft   = nfft;
   this->ntot   = ntot;
   this->npup   = npup;
+  this->lgs    = (lgs == 1 ? true : false);
 
   long *dims_data1 = new long[2];
   dims_data1[0] = 1;
@@ -28,18 +29,18 @@ yoga_wfs::yoga_wfs(long nxsub, long nvalid, long npix, long nphase, long nrebin,
   if (ntot != nfft) {
     dims_data3[1] = ntot; dims_data3[2] = ntot; dims_data3[3] = nvalid;  
     this->d_totimg = new yoga_obj<float>(dims_data3);
-  }
+  } 
 
   dims_data2[1] = npix*nxsub; dims_data2[2] =npix*nxsub ; 
   this->d_binimg = new yoga_obj<float>(dims_data2);
 
   dims_data3[1] = nfft; dims_data3[2] =nfft; dims_data3[3] = nvalid;  
   this->d_hrimg = new yoga_obj<float>(dims_data3);
-
   this->d_camplipup = new yoga_obj<cuFloatComplex>(dims_data3);
   this->d_camplifoc = new yoga_obj<cuFloatComplex>(dims_data3);
 
   int mdims[2];
+
   mdims[0] = (int)dims_data3[1];
   mdims[1] = (int)dims_data3[2];
 
@@ -48,6 +49,17 @@ yoga_wfs::yoga_wfs(long nxsub, long nvalid, long npix, long nphase, long nrebin,
 
   dims_data3[1] = npix; dims_data3[2] = npix; dims_data3[3] = nvalid;  
   this->d_bincube = new yoga_obj<float>(dims_data3);
+
+  if (this->lgs) {
+    dims_data3[1] = ntot; dims_data3[2] =ntot; dims_data3[3] = nvalid;  
+    this->d_lgskern   = new yoga_obj<float>(dims_data3);
+    this->d_ftlgskern = new yoga_obj<cuFloatComplex>(dims_data3);
+    this->d_fttotim   = new yoga_obj<cuFloatComplex>(dims_data3);
+    mdims[0] = (int)dims_data3[1];
+    mdims[1] = (int)dims_data3[2];
+    cufftSafeCall( cufftPlanMany(&(this->d_ftlgskern->plan), 2 ,mdims,NULL,1,0,NULL,1,0,CUFFT_C2C ,(int)dims_data3[3]));
+    cufftSafeCall( cufftPlanMany(&(this->d_fttotim->plan), 2 ,mdims,NULL,1,0,NULL,1,0,CUFFT_C2C ,(int)dims_data3[3]));
+  }
 
   dims_data2[1] = nphase*nphase; dims_data2[2] = nvalid; 
   this->d_phasemap = new yoga_obj<int>(dims_data2);
@@ -86,6 +98,10 @@ yoga_wfs::~yoga_wfs()
   delete this->d_offsets;
   delete this->d_pupil;
   delete this->d_gs;
+  if (this->lgs) {
+    delete this->d_lgskern;
+    delete  this->d_ftlgskern;
+  }
 }
 
 int yoga_wfs::wfs_initgs(float xpos,float ypos,float lambda, float mag, long size)
@@ -102,6 +118,15 @@ int yoga_wfs::wfs_initarrays(int *phasemap,int *hrmap, int *imamap,int *binmap,f
   this->d_binmap->host2device(binmap);
   this->d_imamap->host2device(imamap);
   if (this->ntot != this->nfft) this->d_hrmap->host2device(hrmap);
+  return EXIT_SUCCESS;
+}
+
+int yoga_wfs::load_kernels(float *lgskern, int device)
+{
+  if (this->lgs) this->d_lgskern->host2device(lgskern);
+  launch_cfillrealp(this->d_ftlgskern->d_data,this->d_lgskern->d_data,this->d_ftlgskern->nb_elem,device);
+  yoga_fft(this->d_ftlgskern->d_data,this->d_ftlgskern->d_data,1,this->d_ftlgskern->plan);
+
   return EXIT_SUCCESS;
 }
 
@@ -128,13 +153,39 @@ int yoga_wfs::comp_image(yoga_atmos *yatmos, int device)
   // increase fov if required
   // and fill bincube with data from hrimg
   if (this->ntot != this->nfft) {
+    
+    cutilSafeCall(cudaMemset(this->d_totimg->d_data, 0, 
+			     sizeof(float)*this->d_totimg->nb_elem));
+    
     indexfill(this->d_totimg->d_data,this->d_hrimg->d_data,this->d_hrmap->d_data,
 	      this->nfft,this->ntot,this->d_hrimg->nb_elem,device);
+
+    if (this->lgs) {
+      cutilSafeCall(cudaMemset(this->d_fttotim->d_data, 0, 
+			       sizeof(cuFloatComplex)*this->d_fttotim->nb_elem));
+      launch_cfillrealp(this->d_fttotim->d_data,this->d_totimg->d_data,this->d_totimg->nb_elem,device);
+      yoga_fft(this->d_fttotim->d_data,this->d_fttotim->d_data,1,this->d_fttotim->plan);
+      launch_conv_krnl(this->d_fttotim->d_data,this->d_ftlgskern->d_data,this->d_fttotim->nb_elem,device);
+      yoga_fft(this->d_fttotim->d_data,this->d_fttotim->d_data,-1,this->d_fttotim->plan);
+      launch_cgetrealp(this->d_totimg->d_data,this->d_fttotim->d_data,this->d_fttotim->nb_elem,device);
+      // note : i'm loosing time here need to rewrite fillbincube ...
+    }
 
     fillbincube(this->d_bincube->d_data,this->d_totimg->d_data,this->d_binmap->d_data, 
 		this->ntot * this->ntot,this->npix * this->npix, this->nrebin * this->nrebin,
 		this->nvalid,device);
   } else {
+    if (this->lgs) {
+      cutilSafeCall(cudaMemset(this->d_fttotim->d_data, 0, 
+			       sizeof(cuFloatComplex)*this->d_fttotim->nb_elem));
+      launch_cfillrealp(this->d_fttotim->d_data,this->d_hrimg->d_data,this->d_hrimg->nb_elem,device);
+      yoga_fft(this->d_fttotim->d_data,this->d_fttotim->d_data,1,this->d_fttotim->plan);
+      launch_conv_krnl(this->d_fttotim->d_data,this->d_ftlgskern->d_data,this->d_fttotim->nb_elem,device);
+      yoga_fft(this->d_fttotim->d_data,this->d_fttotim->d_data,-1,this->d_fttotim->plan);
+      launch_cgetrealp(this->d_hrimg->d_data,this->d_fttotim->d_data,this->d_fttotim->nb_elem,device);
+      // note : i'm loosing time here need to rewrite fillbincube ...
+    }
+
     fillbincube(this->d_bincube->d_data,this->d_hrimg->d_data ,this->d_binmap->d_data, 
 		this->nfft * this->nfft,this->npix * this->npix, this->nrebin * this->nrebin,
 		this->nvalid,device);
@@ -150,12 +201,12 @@ int yoga_wfs::comp_image(yoga_atmos *yatmos, int device)
   return EXIT_SUCCESS;
 }
 
-yoga_sensors::yoga_sensors(int nwfs,long *nxsub,long *nvalid,long *npix,long *nphase, long *nrebin,long *nfft, long *ntot, long npup)
+yoga_sensors::yoga_sensors(int nwfs,long *nxsub,long *nvalid,long *npix,long *nphase, long *nrebin,long *nfft, long *ntot, int *lgs, long npup)
 {
   this->nsensors = nwfs;
 
   for (int i=0;i<nwfs;i++) {
-    d_wfs.push_back(new yoga_wfs(nxsub[i],nvalid[i],npix[i],nphase[i],nrebin[i],nfft[i],ntot[i],npup));
+    d_wfs.push_back(new yoga_wfs(nxsub[i],nvalid[i],npix[i],nphase[i],nrebin[i],nfft[i],ntot[i],npup,lgs[i]));
   }
 }
 

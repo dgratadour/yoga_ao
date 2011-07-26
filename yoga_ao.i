@@ -16,6 +16,13 @@ require,"yoga_turbu.i"
 require,"yoga_wfs.i"
 
 func read_parfile(filename)
+/* DOCUMENT read_parfile
+   read_parfile,filename
+     
+   reads yoga parameter file filename
+
+   SEE ALSO:
+ */
 {
   extern y_geom,y_atmos,y_tel,y_target,y_loop,y_wfs;
 
@@ -33,6 +40,19 @@ func read_parfile(filename)
 
 
 func geom_init(pupdiam)
+/* DOCUMENT geom_init
+   geom_init,pupdiam
+     
+   inits simulation geometry, depending on pupdiam
+   the linear number of pixels in the pupil
+   
+   requires 3 externals : y_atmos, y_geom and g_atmos
+   y_atmos : a y_struct for the atmosphere
+   y_geom  : a y_struct for the geometry of the simulation
+   g_atmos : a yAtmos object on the gpu
+
+  SEE ALSO:
+ */
 {
   extern y_atmos,y_geom,g_atmos;
 
@@ -74,6 +94,22 @@ func geom_init(pupdiam)
 }
 
 func atmos_init(void)
+/* DOCUMENT atmos_init
+   atmos_init
+     
+   inits a yAtmos object on the gpu
+   no input parameters
+   
+   requires 2 externals + 2 optional : y_atmos and y_geom + y_target and y_wfs
+   y_atmos  : a y_struct for the atmosphere
+   y_geom   : a y_struct for the geometry of the simulation
+   y_target : a y_struct for the targets
+   y_wfs    : a y_struct for the sensors
+   creates 1 external :
+   g_atmos : a yAtmos object on the gpu
+
+  SEE ALSO:
+ */
 {
   extern g_atmos;
   
@@ -107,8 +143,22 @@ func atmos_init(void)
 }
 
 func wfs_init(void)
+/* DOCUMENT wfs_init
+   wfs_init
+     
+   inits a ySeznsors object on the gpu
+   no input parameters
+   
+   requires 2 externals : y_geom +and y_wfs
+   y_geom   : a y_struct for the geometry of the simulation
+   y_wfs    : a y_struct for the sensors
+   creates 1 external :
+   g_wfs    : a ySensors object on the gpu
+
+  SEE ALSO:
+ */
 {
-  extern y_geom,y_atmos,y_tel,y_target,y_loop;
+  extern y_geom;
   extern g_wfs;
 
   // first get the wfs with max # of subaps
@@ -123,16 +173,50 @@ func wfs_init(void)
     }
   }
   
-  g_wfs = yoga_sensors(numberof(y_wfs),y_wfs.nxsub,y_wfs._nvalid,y_wfs.npix,y_wfs._pdiam,y_wfs._nrebin,y_wfs._Nfft,y_wfs._Ntot,y_geom._n);
+  g_wfs = yoga_sensors(numberof(y_wfs),y_wfs.nxsub,y_wfs._nvalid,y_wfs.npix,y_wfs._pdiam,y_wfs._nrebin,y_wfs._Nfft,y_wfs._Ntot,y_wfs.gsalt > 0,y_geom._n);
   
   sensors_initgs,g_wfs,y_wfs.xpos,y_wfs.ypos,y_wfs.lambda,y_wfs.gsmag,(y_geom._n)(-::numberof(y_wfs)-1);
   
   for (i=1;i<=numberof(y_wfs);i++) {
     sensors_initarr,g_wfs,i-1,int(*y_wfs(i)._phasemap),int(*y_wfs(i)._hrmap),int(*y_wfs(i)._imamap),int(*y_wfs(i)._binmap),complex(*y_wfs(i)._halfxy),float(*y_geom._mpupil);
   }
+
+  // lgs case
+  for (cc=1;cc<=numberof(y_wfs);cc++) {
+    if (y_wfs(cc).gsalt > 0) {
+      // lgs mode requested
+      if (y_wfs(cc).proftype == "None") y_wfs(cc).proftype = "Gauss1";
+      if (y_wfs(cc).proftype == "Gauss1") profilename = "allProfileNa_withAltitude_1Gaussian.fits";
+      if (y_wfs(cc).proftype == "Gauss2") profilename = "allProfileNa_withAltitude_2Gaussians.fits";
+      if (y_wfs(cc).proftype == "Gauss3") profilename = "allProfileNa_withAltitude_3Gaussians.fits";
+      if (y_wfs(cc).proftype == "Exp") profilename = "allProfileNa_withAltitude.fits";
+      prof=fits_read(YOGA_AO_SAVEPATH+profilename);
+      h    = prof(,1);
+      prof = prof(,2:)(,avg);
+      prep_lgs_prof,cc,prof,h,y_wfs(cc).beamsize;
+      "lgs mode";
+      sensors_loadkernels,g_wfs,cc-1,float(*y_wfs(cc)._lgskern);
+    }
+  }
 }
 
 func target_init(void)
+/* DOCUMENT target_init
+   target_init
+     
+   inits a yTarget object on the gpu
+   no input parameters
+   
+   requires 4 externals + 1 optional : y_geom y_atmos and y_target + y_wfs
+   y_geom   : a y_struct for the geometry of the simulation
+   y_atmos  : a y_struct for the atmosphere
+   y_target : a y_struct for the targets
+   y_wfs    : a y_struct for the sensors
+   creates 1 external :
+   g_target    : a yTarget object on the gpu
+
+  SEE ALSO:
+ */
 {
   extern g_target;
   

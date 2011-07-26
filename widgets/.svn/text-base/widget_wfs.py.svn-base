@@ -51,7 +51,7 @@ class wfs:
          # add stdin to the event loop (yorick input pipe by spawn)
          gobject.io_add_watch(sys.stdin,gobject.IO_IN|gobject.IO_HUP,self.yo2py,None)
 
-      #self.glade.get_widget('expander1').set_expanded(0)
+      self.glade.get_widget('lgs_expander').set_expanded(0)
       #self.glade.get_widget('expander2').set_expanded(0)
       #self.glade.get_widget('layer_select').set_active(0)
       #self.glade.get_widget('target_select').set_active(0)
@@ -151,6 +151,7 @@ class wfs:
       self.py2yo('update_wfs_prop %d' % (nwfs))
 
    def y_init_wfs_prop(self,nwfs):
+      lgsf = self.glade.get_widget('checklgs').get_active()
       nsub       = self.glade.get_widget('nsub').get_value()
       npix       = self.glade.get_widget('npix').get_value()
       pixsize    = self.glade.get_widget('pixsize').get_value()
@@ -162,6 +163,15 @@ class wfs:
       throughput = self.glade.get_widget('throughput').get_value()
       lambdai    = self.glade.get_widget('lambda').get_value()
       self.py2yo('init_wfs_prop %d %d %d %f %f %f %f %f %f %f %f' % (nwfs,nsub,npix,pixsize,mag,xpos,ypos,lambdai,frac,zp,throughput))
+      if (lgsf):
+         gsalt    = self.glade.get_widget('lgsalt').get_value()
+         lltx     = self.glade.get_widget('lltx').get_value()
+         llty     = self.glade.get_widget('llty').get_value()
+         power    = self.glade.get_widget('power').get_value()
+         wreturn  = self.glade.get_widget('lgsreturn').get_value()
+         proftype = self.glade.get_widget('lgs_prof').get_active_text()
+         beam     = self.glade.get_widget('beam').get_value()
+         self.py2yo('init_wfs_prop_lgs %f %f %f %f %f "%s" %f' % (gsalt,lltx,llty,power,wreturn,proftype,beam))
 
    def y_init_wfs(self,dummy):
       self.py2yo('create_wfs %d' % (1))
@@ -197,6 +207,13 @@ class wfs:
    def on_rm_wfs_clicked(self,wdg):
       nwfs = self.glade.get_widget('wfs_select').get_active()
       self.py2yo('remove_wfs %d' % (nwfs+1))
+
+   def on_checklgs_toggled(self,wdg):
+      lgsf = wdg.get_active()
+      if (lgsf):
+         self.glade.get_widget('lgs_expander').set_expanded(1)
+      else:
+         self.glade.get_widget('lgs_expander').set_expanded(0)
 
    ######################################################
    # Main pane

@@ -1,15 +1,25 @@
 require,"yoga_aolib.i";
 require,"util_fr.i";
 
-func create_screen(r0,pupixsize,screen_size,&A,&B,&ist)
-{
-  AB, screen_size, A, B, ist;   // initialisation for A and B matrices for phase extrusion
-  screen = array(0.0,screen_size,screen_size);   // init of first phase screen
-  for(i=1;i<=2*screen_size;i++) screen=extrude(screen, r0/pupixsize, A, B, ist);
-  return screen;
-}
-
 func yoga_atmos_create(nscreen,r0,pupixsize,screen_size,frac,alt,windspeed,winddir,deltax,deltay,pupil)
+/* DOCUMENT yoga_atmos_create
+   g_atmos = yoga_atmos_create(nscreen,r0,pupixsize,screen_size,frac,alt,windspeed,winddir,deltax,deltay,pupil)
+
+   creates an extrude ready yAtmos object on the gpu with all proper inits
+   nscreen     : number of screens
+   r0          : total r0 @ 0.5µm
+   pupixsize   : pupil pixel size (in meters)
+   screen_size : array of screen sizes (in pixels) for each layer
+   frac     : array of r0 fractions per layers
+   alt      : array of altitudes per layers
+   wspeed   : array of wind speeds per layers
+   wdir     : array of wind directions per layers
+   deltax   : array of x displacement per iteration (one per layers)
+   deltay   : array of y displacement per iteration (one per layers)
+   pupil    : array containing the pupil
+
+   SEE ALSO:
+ */
 {
   dirsave = YOGA_AO_SAVEPATH+"turbu/";
   mkdirp,dirsave;
@@ -62,8 +72,7 @@ func yoga_atmos_create(nscreen,r0,pupixsize,screen_size,frac,alt,windspeed,windd
   */
 
   r0 = r0  / frac^(3./5.);
-  
-  atmos_obj = yoga_atmos(int(nscreen),float(r0/pupixsize),long(screen_size),long(size2),float(frac),float(alt),float(windspeed),float(winddir),float(deltax),float(deltay),float(pupil));
+  atmos_obj = yoga_atmos(int(nscreen),float(r0/pupixsize),long(screen_size),long(size2),float(alt),float(windspeed),float(winddir),float(deltax),float(deltay),float(pupil));
   
   atmos_obj;
 
@@ -81,6 +90,27 @@ func yoga_atmos_create(nscreen,r0,pupixsize,screen_size,frac,alt,windspeed,windd
   return atmos_obj;
 }
 
+
+func create_screen(r0,pupixsize,screen_size,&A,&B,&ist)
+/* DOCUMENT create_screen
+   screen = create_screen(r0,pupixsize,screen_size,&A,&B,&ist)
+
+   creates a phase screen and fill it with turbulence
+   r0          : total r0 @ 0.5µm
+   pupixsize   : pupil pixel size (in meters)
+   screen_size : screen size (in pixels)
+   A           : A array for future extrude
+   B           : B array for future extrude
+   ist         : istencil array for future extrude
+
+   SEE ALSO:
+ */
+{
+  AB, screen_size, A, B, ist;   // initialisation for A and B matrices for phase extrusion
+  screen = array(0.0,screen_size,screen_size);   // init of first phase screen
+  for(i=1;i<=2*screen_size;i++) screen=extrude(screen, r0/pupixsize, A, B, ist);
+  return screen;
+}
 
 /*  *************************************************************
 Extrude functions.

@@ -1,7 +1,7 @@
 K 25
 svn:wc:ra_dav:version-url
 V 44
-/repos/yoga/!svn/ver/317/trunk/yoga_ao/glade
+/repos/yoga/!svn/ver/323/trunk/yoga_ao/glade
 END
 widget_sky.glade
 K 25
@@ -13,5 +13,5 @@ widget_wfs.glade
 K 25
 svn:wc:ra_dav:version-url
 V 61
-/repos/yoga/!svn/ver/321/trunk/yoga_ao/glade/widget_wfs.glade
+/repos/yoga/!svn/ver/323/trunk/yoga_ao/glade/widget_wfs.glade
 END

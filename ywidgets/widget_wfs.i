@@ -81,6 +81,22 @@ func init_wfs_prop(numwfs,nsub,npix,pixsize,mag,xpos,ypos,lambda,frac,zp,through
   }
 }
 
+func init_wfs_prop_lgs(gsalt,lltx,llty,power,wreturn,proftype,beam)
+{
+  extern y_wfs;
+
+  if (y_wfs == []) return;
+  else {
+    y_wfs(numwfs).gsalt            = gsalt*1.e3;
+    y_wfs(numwfs).lltx             = lltx;
+    y_wfs(numwfs).llty             = llty;
+    y_wfs(numwfs).laserpower       = power;
+    y_wfs(numwfs).lgsreturnperwatt = wreturn;
+    y_wfs(numwfs).proftype         = proftype;
+    y_wfs(numwfs).beamsize         = beam;
+  }
+}
+
 
 func create_wfs(numwfs)
 {

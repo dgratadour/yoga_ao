@@ -3,6 +3,23 @@ require,"yoga_ao_ystruct.i";
 require,"yoga_ao_utils.i"
 
 func init_wfs_size(wfs,&pdiam,&Nfft,&Ntot,&nrebin,&pixsize,&qpixsize)
+/* DOCUMENT init_wfs_size
+   init_wfs_size,wfs,pdiam,Nfft,Ntot,nrebin,pixsize,qpixsize
+
+   computes the quatum pixel sizes and all useful dimensions for a given wfs
+   requires 2 externals : y_atmos & y_tel
+   y_atmos : a atmos_struct()
+   y_tel   : a tel_struct()
+   wfs     : wfs_struct as input (input)
+   pdiam   : pupil diam for each subap (pixels) (output)
+   Nfft    : fft size for a subap (pixels) (output)
+   Ntot    : hr image size for a subap (pixels) (output)
+   nrebin  : rebin factor for a subap (output)
+   pixsize : simulated pixel size for a subap (arcsec) (output)
+   qpixsize: quantum pixel size for a subap (arcsec) (output)
+   
+   SEE ALSO:
+ */
 {
   /*
     Scheme to determine arrays sizes ...
@@ -29,7 +46,7 @@ func init_wfs_size(wfs,&pdiam,&Nfft,&Ntot,&nrebin,&pixsize,&qpixsize)
     
     subapdiam = y_tel.diam / double(wfs.nxsub); // diam of subap
     
-    k = 5;
+    k = 6;
     pdiam = long(k * subapdiam / r0); // number of phase points per subap
     
     nrebin = long(2 * subapdiam * wfs.pixsize / (wfs.lambda*1.e-6) / RASC) + 1;
@@ -72,8 +89,20 @@ func init_wfs_size(wfs,&pdiam,&Nfft,&Ntot,&nrebin,&pixsize,&qpixsize)
 }
 
 func init_wfs_geom(n,pupil)
+/* DOCUMENT init_wfs_geom
+   init_wfs_geom,n,pupil
+
+   inits a wfs geometry (arrays used for image manipulation in the wfs model)
+   requires 2 externals : y_atmos & y_wfs
+   y_atmos : a atmos_struct()
+   y_wfs   : a wfs_struct()
+   n       : index of wfs to init
+   pupil   : the pupil array
+   
+   SEE ALSO:
+ */
 {
-  extern y_wfs, g_wfs;
+  extern y_wfs;
 
   write,format="\n*-----------------------\nDoing inits on WFS # %d\n",n;
 
@@ -179,8 +208,11 @@ func init_wfs_geom(n,pupil)
   binmap = array(0,y_wfs(n)._nrebin*y_wfs(n)._nrebin,y_wfs(n).npix*y_wfs(n).npix);
   tmp = indices(y_wfs(n)._Ntot)-1;
   tmp = tmp(,,1)+tmp(,,2)*y_wfs(n)._Ntot;
-  for (i=1;i<=y_wfs(n).npix*y_wfs(n).npix;i++)
-    binmap(,i) = tmp(where(roll(binindices) == i));
+  for (i=1;i<=y_wfs(n).npix*y_wfs(n).npix;i++) {
+    if (y_wfs(n).gsalt > 0) binmap(,i) = tmp(where(binindices == i));
+    else
+      binmap(,i) = tmp(where(roll(binindices) == i));
+  }
   y_wfs(n)._binmap = &int(binmap);
 
   /* verif
@@ -233,69 +265,9 @@ func make_lgs(proftype)
 
 }
 
-func makeLgsProfile1D(n, z, lgsWidth, prof, h, dOffAxis, H, center=)
-{
-  
-  np = dimsof(prof)(2);                       // number of points of the profile
-  hG = sum(h*prof)/sum(prof);       // center of gravity of the profile, expressed as an index
-  // transformation de h en arcsec
-  zhc = (h-hG)*(206265.*dOffAxis/double(H)^2.);   // height, translated in arcsec due to perspective effect
-    
-  x=(indgen(n)-(n/2+1));       // x expressed in pixels. (0,0) is in the fourier-center.
-  x = x*z;           // x expressed in arcseconds
-
-  /* If one has to undersample the inital profile, then some structures may be "lost". In this case,
-     it's better to try to "save" those structures by re-sampling the integral of the profile, and
-     then derivating it afterwards.
-     Now, if the initial profile is a coarse one, and that one has to oversample it, then a
-     simple re-sampling of the profile is adequate.
-   */
-  dzhc = zhc(2)-zhc(1);   // sampling period of initial profile
-  if( z>dzhc ) {
-    aprof = interp(prof(cum), zhc(pcen), x(pcen) )(dif);   // resampled profile in 1D
-  } else {
-    aprof = interp( prof, zhc, x );   // resampled profile in 1D
-  }
-  //aprof=interp(aprof,x,x+sum(x*aprof)/sum(aprof));
-
-  dec = 0.0;
-  if( center=="image" ) dec = z/2;   // dec will allow to shift the image by z/2 if image-centered is required
-  
-  w = lgsWidth / 2.35482005;      //  sigma.   (2*sqrt(2*log(2)))=2.35482005
-  if( w==0 ) {
-    g = array(0.0,n);
-    if( center=="image" )
-      g(n/2:n/2+1)=0.5;
-    else
-      g(n/2+1)=1;
-  }
-  else {
-    if( center=="image" )
-      g = exp( -((x+z/2)^2/(2*w^2.) ) );
-    else
-      g = exp( -(x^2/(2*w^2.) ) );
-    //=mygauss2(24,13,13,wx*2*sqrt(2*log(2)),wy*2*sqrt(2*log(2)),1.,0.,0.,,deriv=0);
-  }
-  // convolved profile in 1D.
-  p1d = roll(fft(fft(aprof) * fft(g),-1).re);
-  // abs is just to ensure only positive values (else values ~ -1e-12 may appear)
-  p1d = abs(p1d);
-  im = p1d(,-) * g(-,);
-  
-  return im/max(im);
-}
-
-
-/*
-  if (center == "image") {
-    im = rotate(im,azimut,n/2+0.5,n/2+0.5);
-  } else {
-    im = rotate(im,azimut,n/2+1,n/2+1);    
-  }
-
- */
 func prep_lgs_prof(numwfs,prof,h,beam,center=)
-/* DOCUMENT
+/* DOCUMENT prep_lgs_prof
+   prep_lgs_prof,numwfs,prof,h,beam,center=
 
    The function returns an image array(double,n,n) of a laser beacon elongated by perpective
    effect. It is obtaind by convolution of a gaussian of width "lgsWidth" arcseconds, with the
@@ -329,7 +301,9 @@ func prep_lgs_prof(numwfs,prof,h,beam,center=)
   extern y_wfs;
   
   subapdiam = y_tel.diam / double(y_wfs(numwfs).nxsub); // diam of subap
-  xsubs = span(-y_tel.diam/2+subapdiam/2,y_tel.diam/2-subapdiam/2,y_wfs(numwfs).nxsub);
+  if (y_wfs(numwfs).nxsub > 1)
+    xsubs = span(-y_tel.diam/2+subapdiam/2,y_tel.diam/2-subapdiam/2,y_wfs(numwfs).nxsub);
+  else xsubs = 0.;
   ysubs = xsubs;
   
   np = dimsof(prof)(2);       // number of points of the profile
@@ -339,31 +313,39 @@ func prep_lgs_prof(numwfs,prof,h,beam,center=)
   x = x*y_wfs(numwfs)._qpixsize;  // x expressed in arcseconds
   dx = x(2)-x(1);
 
-  dOffAxis = sqrt((xsubs((*y_wfs(numwfs)._validsubs)(1,))-y_wfs(numwfs).lltx)^2 +
-             (ysubs((*y_wfs(numwfs)._validsubs)(2,))-y_wfs(numwfs).llty)^2);
-
-
-  profi = array(0.0f,y_wfs(numwfs)._Ntot,y_wfs(numwfs)._nvalid);
   
-  for (cc=1;cc<=y_wfs(numwfs)._nvalid;cc++) {
+  if (y_wfs(numwfs).nxsub > 1)
+    dOffAxis = sqrt((xsubs((*y_wfs(numwfs)._validsubs)(1,))-y_wfs(numwfs).lltx)^2 +
+                    (ysubs((*y_wfs(numwfs)._validsubs)(2,))-y_wfs(numwfs).llty)^2);
+  else 
+    dOffAxis = sqrt((xsubs-y_wfs(numwfs).lltx)^2 +
+                    (ysubs-y_wfs(numwfs).llty)^2);
+  
+  subsdone = array(1,y_wfs(numwfs)._nvalid);
+  
+  profi = array(0.0f,y_wfs(numwfs)._Ntot,y_wfs(numwfs)._nvalid);
+
+  while (subsdone(*)(sum) > 0) {
+    tmp = dOffAxis(where(subsdone)(1));
+    inds = where(dOffAxis == tmp);
     // height, translated in arcsec due to perspective effect
-    zhc = (h-hG)*(206265.*dOffAxis(cc)/double(hG)^2.); 
-
+    zhc = (h-hG)*(206265.*tmp/double(hG)^2.); 
     dzhc = zhc(2)-zhc(1);
-
+    
     if (y_wfs(numwfs)._qpixsize > dzhc) {
       x_tmp = x(pcen);
       zhc_tmp = zhc(pcen);
       prof_tmp = prof(cum);
-      profi(,cc) = interp(prof_tmp,zhc_tmp,x_tmp)(dif)*dzhc/dx;
+      profi(,inds) = interp(prof_tmp,zhc_tmp,x_tmp)(dif)*dzhc/dx;
     } else {
       x_tmp = x;
       zhc_tmp = zhc;
       prof_tmp = prof;
-      profi(,cc) = interp(prof_tmp,zhc_tmp,x_tmp)*dzhc/dx;
-    }    
-  }
-
+      profi(,inds) = interp(prof_tmp,zhc_tmp,x_tmp)*dzhc/dx;
+    }
+    subsdone(inds) = 0;
+  }  
+  
   /*
     place for manual interp
    */
@@ -384,7 +366,7 @@ func prep_lgs_prof(numwfs,prof,h,beam,center=)
   }
 
   // convolved profile in 1D.
-  p1d = roll(fft(fft(profi,[1,0]) * fft(g(,-:1:y_wfs(numwfs)._nvalid),[1,0]),[-1,0]).re);
+  p1d = roll(fft(fft(profi,[1,0]) * fft(g(,-:1:y_wfs(numwfs)._nvalid),[1,0]),[-1,0]).re,[y_wfs(numwfs)._Ntot/2,0]);
   // abs is just to ensure only positive values (else values ~ -1e-12 may appear)
   p1d = abs(p1d);
   im = p1d(,-,) * g(-,,-:1:y_wfs(numwfs)._nvalid);
@@ -392,20 +374,31 @@ func prep_lgs_prof(numwfs,prof,h,beam,center=)
     xcent = ycent = y_wfs(numwfs)._Ntot/2+0.5;
   else
     xcent = ycent = y_wfs(numwfs)._Ntot/2+1;
-  
+
   for (cc=1;cc<=y_wfs(numwfs)._nvalid;cc++) {
     xsub = xsubs((*y_wfs(numwfs)._validsubs)(1,cc));
     ysub = ysubs((*y_wfs(numwfs)._validsubs)(2,cc));
     azimut = atan(ysub-y_wfs(numwfs).llty,xsub-y_wfs(numwfs).lltx);
     azimut = azimut*180./pi;
-    azimut
     im(,,cc) = fft_rotate(im(,,cc),-azimut);
+    im(,,cc) /= sum(im(,,cc));
   }
-  error;
+
+  y_wfs(numwfs)._lgskern = &float(im);
 } 
 
 
 func wfs_map(arr,wfs,type=)
+/* DOCUMENT wfs_map
+   wfs_map,arr,wfs,type=
+
+   maps an array of images onto a wfs
+   arr     : the array to map
+   wfs     : the wfs on which to map
+   type    : type of mapping
+   
+   SEE ALSO:
+ */
 {
   if (type == []) type = "subaps"
   if (type == "subaps") {
@@ -415,87 +408,17 @@ func wfs_map(arr,wfs,type=)
     tmp(where(*wfs._isvalid)) = arr;
     return tmp;
   }
-}
-
-func fft_rotate(im,angle,xc=,yc=,gband=)
-/* DOCUMENT fft_rotate(im,angle)
-   im    : square image
-   angle : rotation angle in degrees (clockwise)
-   xc,yc : x,y positions of the rotation center
-   
-   high precision image rotation using fft
-   no information loss if : image is shannon sampled
-                            image has sufficiently large guard band
-   using the algorithm from :
-   "Fast Fourier method for the accurate rotation of sampled images"
-   Kieran G. Larkin, Michael A. Oldfield, Hanno Klemm
-   Optics Communications 139 (1997) 99-106
-
-   routine by d. gratadour 31/05/2011
-   SEE ALSO:
- */
-
-{
-  
-  size = dimsof(im);
-  if (size(2) != size(3)) error,"works only on square images";
-  nx = size(2);
-
-  if (angle >= 360) angle = angle % 360;
-  if (angle > 180) return fft_rotate(im,angle-360,xc=xc,yc=yc,gband=gband);
-  if (angle < -180) return fft_rotate(im,360+angle,xc=xc,yc=yc,gband=gband);
-
-  if (gband != 0) {
-    im2=array(double,2*nx,2*nx);
-    im2(nx/2+1:nx/2+nx,nx/2+1:nx/2+nx) = im;
-    im = im2;
-    nx *= 2;
-  }
-  
-  if (xc == []) xc = ((nx/2)%2 == 0 ? nx/2 : nx/2+0.5);
-  if (yc == []) yc = ((nx/2)%2 == 0 ? nx/2 : nx/2+0.5);
-
-  theta = angle * pi/180.;
-  
-  if (angle > 90) theta = pi/2;
-  if (angle < -90) theta = -pi/2;
-
-  stepx = tan(theta/2);
-  stepy = -1.*sin(theta);
-
- if (nx%2) {
-    tiltx = -2.*pi/nx*(float(stepx)*(indgen(nx)-nx/2-0.5));
-    tilty = -2.*pi/nx*(float(stepy)*(indgen(nx)-nx/2-0.5));
-  } else {
-    tiltx = -2.*pi/nx*(float(stepx)*(indgen(nx)-nx/2-1));
-    tilty = -2.*pi/nx*(float(stepy)*(indgen(nx)-nx/2-1));
-  }
-  
-  compltiltx=array(complex,nx);
-  compltiltx.im=roll(tiltx);
-  compltiltx = compltiltx(,-::nx-1);
-  
-  compltilty=array(complex,nx);
-  compltilty.im=roll(tilty);
-  compltilty = compltilty(-::nx-1,);
-  
-  col  = span(1,nx,nx)(,-:1:nx);
-  lig  = transpose(col);
-    
-  tmpc=array(complex,nx,nx);
-
-  tmpc = fft(exp(compltiltx*(lig-xc))*fft(im,[1,0]),[-1,0]);
-  tmpc = fft(exp(compltilty*(col-yc))*fft(tmpc,[0,1]),[0,-1]);
-  tmpc = fft(exp(compltiltx*(lig-xc))*fft(tmpc,[1,0]),[-1,0]);
-
-  if (angle > 90) {
-    return fft_rotate(tmpc.re/nx/nx/nx,angle-90.,xc=xc,yc=yc,gband=0);
-  } else {
-    if (angle < -90) {
-      return fft_rotate(tmpc.re/nx/nx/nx,angle+90.,xc=xc,yc=yc,gband=0);
-    } else {
-      return tmpc(nx/4+1:nx/4+nx/2,nx/4+1:nx/4+nx/2).re/nx/nx/nx;
+  if (type == "image") {
+    if (dimsof(arr)(1) != 3)
+      error,"wfs_map : wrong input dims";
+    sz = dimsof(arr)(2);
+    tmp = array(structof(arr),wfs.nxsub*sz,wfs.nxsub*sz);
+    for (cc=1;cc<=wfs._nvalid;cc++) {
+      indi = ((*wfs._validsubs)(1,cc)-1)*sz+1;
+      indj = ((*wfs._validsubs)(2,cc)-1)*sz+1;
+      tmp(indi:indi+sz-1,indj:indj+sz-1) = arr(,,cc);
     }
+    return tmp;
   }
 }
 

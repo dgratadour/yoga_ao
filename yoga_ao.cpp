@@ -153,7 +153,6 @@ extern "C" {
     p = atmos_obj_handler->d_screens.begin();
     cout << "Yoga Atmos Object : " << endl;
     cout << "Contains " << atmos_obj_handler->nscreens << " turbulent screen(s) : " << endl;
-    cout << "r_0 = " << atmos_obj_handler->r0 << " m" << endl;
     int i =0;
     yoga_tscreen *tmp;
     while (p != atmos_obj_handler->d_screens.end()) {
@@ -195,35 +194,31 @@ extern "C" {
       size2 = ygeta_l(argc-4, &ntot,dims);
       if (ntot != nscreens) y_error("wrong dimension for screens size");
 
-      float *frac;
-      frac = ygeta_f(argc-5, &ntot,dims);
-      if (ntot != nscreens) y_error("wrong dimension for screens frac");
-
       float *alt;
-      alt = ygeta_f(argc-6, &ntot,dims);
+      alt = ygeta_f(argc-5, &ntot,dims);
       if (ntot != nscreens) y_error("wrong dimension for screens alt");
 
       float *wspeed;
-      wspeed = ygeta_f(argc-7, &ntot,dims);
+      wspeed = ygeta_f(argc-6, &ntot,dims);
       if (ntot != nscreens) y_error("wrong dimension for screens speed");
 
       float *wdir;
-      wdir = ygeta_f(argc-8, &ntot,dims);
-      if (ntot != nscreens) y_error("wrong dimension for screens speed");
+      wdir = ygeta_f(argc-7, &ntot,dims);
+      if (ntot != nscreens) y_error("wrong dimension for screens dir");
 
       float *deltax;
-      deltax = ygeta_f(argc-9, &ntot,dims);
-      if (ntot != nscreens) y_error("wrong dimension for screens speed");
+      deltax = ygeta_f(argc-8, &ntot,dims);
+      if (ntot != nscreens) y_error("wrong dimension for screens deltax");
 
        float *deltay;
-      deltay = ygeta_f(argc-10, &ntot,dims);
-      if (ntot != nscreens) y_error("wrong dimension for screens speed");
+      deltay = ygeta_f(argc-9, &ntot,dims);
+      if (ntot != nscreens) y_error("wrong dimension for screens deltay");
 
       float *pupil;
-      pupil = ygeta_f(argc-11, &ntot,dims);
+      pupil = ygeta_f(argc-10, &ntot,dims);
       //if (ntot != nscreens) y_error("wrong dimension for screens speed");
 
-     if (argc > 11) odevice = ygets_i(argc-12);
+     if (argc > 10) odevice = ygets_i(argc-11);
       if (odevice != activeDevice) {
 	if (odevice > _nbDevice()-1) {
 	  cout << "### Invalid Device Id : " << odevice <<" Your system has only " << 
@@ -779,9 +774,10 @@ __        _______ ____
       long nrebin = ygets_l(argc-5);
       long nfft = ygets_l(argc-6);
       long ntot = ygets_l(argc-7);
-      long npup = ygets_l(argc-8);
+      int  lgs = ygets_l(argc-8);
+      long npup = ygets_l(argc-9);
       
-      if (argc > 8) odevice = ygets_i(argc-9);
+      if (argc > 9) odevice = ygets_i(argc-10);
       if (odevice != activeDevice) {
 	if (odevice > _nbDevice()-1) {
 	  cout << "### Invalid Device Id : " << odevice <<" Your system has only " << 
@@ -797,7 +793,7 @@ __        _______ ____
       wfs_struct *handle=(wfs_struct *)ypush_obj(&yWfs, sizeof(wfs_struct));
       handle->device = odevice;
       
-      handle->yoga_wfs = new yoga_wfs(nxsub,nvalid,npix,nphase,nrebin,nfft,ntot,npup);
+      handle->yoga_wfs = new yoga_wfs(nxsub,nvalid,npix,nphase,nrebin,nfft,ntot,lgs,npup);
       
     } catch ( string msg ) {
       y_error(msg.c_str());
@@ -904,9 +900,11 @@ __        _______ ____
 
       long *ntota = ygeta_l(argc-8, &ntot,dims);
 
-      long npup = ygets_l(argc-9);
+      int *lgs = ygeta_i(argc-9, &ntot,dims);
 
-      if (argc > 9) odevice = ygets_i(argc-10);
+      long npup = ygets_l(argc-10);
+
+      if (argc > 10) odevice = ygets_i(argc-11);
       if (odevice != activeDevice) {
 	if (odevice > _nbDevice()-1) {
 	  cout << "### Invalid Device Id : " << odevice <<" Your system has only " << 
@@ -922,7 +920,7 @@ __        _______ ____
       sensors_struct *handle=(sensors_struct *)ypush_obj(&ySensors, sizeof(sensors_struct));
       handle->device = odevice;
       
-      handle->yoga_sensors = new yoga_sensors(nsensors,nxsub,nvalid,npix,nphase,nrebin,nfft,ntota,npup);
+      handle->yoga_sensors = new yoga_sensors(nsensors,nxsub,nvalid,npix,nphase,nrebin,nfft,ntota,lgs,npup);
       
     } catch ( string msg ) {
       y_error(msg.c_str());
@@ -1010,6 +1008,23 @@ __        _______ ____
   }
 
   void
+  Y_sensors_loadkernels(int argc)
+  {    
+    long ntot;
+    long dims[Y_DIMSIZE];
+    sensors_struct *handler = (sensors_struct *)yget_obj(argc-1,&ySensors);
+    yoga_sensors *sensors_handler = (yoga_sensors *)(handler->yoga_sensors);
+
+    if (handler->device != activeDevice) yoga_setDevice(handler->device);
+
+    int nsensor = ygets_i(argc-2);
+
+    float *kernels = ygeta_f(argc-3, &ntot,dims);
+
+    sensors_handler->d_wfs.at(nsensor)->load_kernels(kernels,handler->device);
+  }
+
+  void
   Y_sensors_compimg(int argc)
   {    
     long ntot;
@@ -1081,6 +1096,17 @@ __        _______ ____
     if (strcmp(type_data, "totimg")==0) {
       float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_totimg->dims_data);
       sensors_handler->d_wfs.at(nsensor)->d_totimg->device2host(data);
+    }
+    if (strcmp(type_data, "lgskern")==0) {
+      float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_lgskern->dims_data);
+      sensors_handler->d_wfs.at(nsensor)->d_lgskern->device2host(data);
+    }
+    if (strcmp(type_data, "ftlgskern")==0) {
+      long *ndims_data = new long[5];
+      ndims_data[0]=4;ndims_data[1]=2;
+      memcpy(&ndims_data[2],&(sensors_handler->d_wfs.at(nsensor)->d_ftlgskern->getDims()[1]),sizeof(long)*3);
+      float *data = ypush_f(ndims_data);
+      sensors_handler->d_wfs.at(nsensor)->d_ftlgskern->device2host((cuFloatComplex *)data);
     }
 
   }

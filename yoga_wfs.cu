@@ -175,3 +175,109 @@ int indexfill(float *d_odata,float *d_idata,int *indx,int nx, int Nx, int N,int 
 
   return EXIT_SUCCESS;
 }
+
+__global__ void cfillrealp(cuFloatComplex *odata, float *idata, int N)
+{
+
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+  while (tid < N) {
+    odata[tid].x = idata[tid];
+    tid += blockDim.x * gridDim.x;
+  }
+}
+
+int launch_cfillrealp(cuFloatComplex *d_odata,float *d_idata,int N,int device)
+{
+
+  struct cudaDeviceProp deviceProperties;
+  cudaGetDeviceProperties(&deviceProperties, device);
+    
+  int maxThreads = deviceProperties.maxThreadsPerBlock;
+  int nBlocks = deviceProperties.multiProcessorCount*8;
+  int nThreads = (N + nBlocks -1)/nBlocks;
+
+  if (nThreads > maxThreads) {
+    nThreads = maxThreads;
+    nBlocks = (N + nThreads  -1)/nThreads;
+  }
+
+  dim3 grid(nBlocks), threads(nThreads);
+  //  dim3 grid(128), threads(128);
+
+  cfillrealp<<<grid, threads>>>(d_odata, d_idata, N);
+
+   return EXIT_SUCCESS;
+}
+
+__global__ void conv_krnl(cuFloatComplex *odata,cuFloatComplex *idata, int N)
+{
+
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+  cuFloatComplex tmp;
+
+  while (tid < N) {
+    tmp.x = idata[tid].x*odata[tid].x+idata[tid].y*odata[tid].y;
+    tmp.y = -1.0f*idata[tid].y*odata[tid].x+idata[tid].x*odata[tid].y;
+    odata[tid] = tmp;
+    tid += blockDim.x * gridDim.x;
+  }
+}
+
+int launch_conv_krnl(cuFloatComplex *d_odata,cuFloatComplex *d_idata,int N,int device)
+{
+
+  struct cudaDeviceProp deviceProperties;
+  cudaGetDeviceProperties(&deviceProperties, device);
+    
+  int maxThreads = deviceProperties.maxThreadsPerBlock;
+  int nBlocks = deviceProperties.multiProcessorCount*8;
+  int nThreads = (N + nBlocks -1)/nBlocks;
+
+  if (nThreads > maxThreads) {
+    nThreads = maxThreads;
+    nBlocks = (N + nThreads  -1)/nThreads;
+  }
+
+  dim3 grid(nBlocks), threads(nThreads);
+  //  dim3 grid(128), threads(128);
+
+  conv_krnl<<<grid, threads>>>(d_odata, d_idata, N);
+
+   return EXIT_SUCCESS;
+}
+
+__global__ void cgetrealp(float *odata, cuFloatComplex *idata, int N)
+{
+
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+  while (tid < N) {
+    odata[tid] = idata[tid].x;
+    tid += blockDim.x * gridDim.x;
+  }
+}
+
+int launch_cgetrealp(float *d_odata,cuFloatComplex *d_idata,int N,int device)
+{
+
+  struct cudaDeviceProp deviceProperties;
+  cudaGetDeviceProperties(&deviceProperties, device);
+    
+  int maxThreads = deviceProperties.maxThreadsPerBlock;
+  int nBlocks = deviceProperties.multiProcessorCount*8;
+  int nThreads = (N + nBlocks -1)/nBlocks;
+
+  if (nThreads > maxThreads) {
+    nThreads = maxThreads;
+    nBlocks = (N + nThreads  -1)/nThreads;
+  }
+
+  dim3 grid(nBlocks), threads(nThreads);
+  //  dim3 grid(128), threads(128);
+
+  cgetrealp<<<grid, threads>>>(d_odata, d_idata, N);
+
+   return EXIT_SUCCESS;
+}
+
