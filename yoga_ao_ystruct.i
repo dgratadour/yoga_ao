@@ -1,10 +1,10 @@
 struct geom_struct
 {
-  long  pupdiam;     // linear size of total pupil (in pixels)
   long  ssize;       // linear size of full image (in pixels)
   float zenithangle; // observations zenith angle (in deg)
   
   // internal keywords
+  long  pupdiam;     // linear size of total pupil (in pixels)
   float cent;        // central point of the simulation
   pointer _ipupil;   // total pupil (include full guard band)
   pointer _mpupil;   // medium pupil (part of the guard band)

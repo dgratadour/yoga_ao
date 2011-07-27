@@ -111,18 +111,28 @@ func calc_dphi(phase,pup,den)
   npix = dimsof(phase)(2);
   mi = p = dphi = array(float,[2,2*npix,2*npix]);
   mi(1:npix,1:npix) = phase;
-  dphi = (mi - mi(1,1))^2;
-  /*
   p(1:npix,1:npix)  = pup;
 
   //den  = (fft(fft(p,1)*conj(fft(p,1)),-1)).re;
   mask = den > max(den)*1.e-7;
   pix  = where(mask);
-  tmp = fft( abs(fft(mi*p))^2. ).re;
-  tmp(pix) /= (den)(pix);
-  dphi(pix) = tmp(1,1) - tmp(pix);
-  */
-  //dphi(pix) = fft(2*((fft(mi^2*p,1)*conj(fft(p,1))).re - abs(fft(mi*p,1))^2),-1).re(pix)/den(pix);
+  //tmp = fft( abs(fft(mi*p))^2. ).re;
+  //tmp(pix) /= (den)(pix);
+  //dphi(pix) = tmp(1,1) - tmp(pix);
+  dphi(pix) = fft(2*((fft(mi^2*p,1)*conj(fft(p,1))).re - abs(fft(mi*p,1))^2),-1).re(pix)/den(pix);
+
+  return dphi; 
+}
+
+func calc_dphis(phase)
+/* DOCUMENT
+ * 
+ */ 
+{
+  npix = dimsof(phase)(2);
+  mi = p = dphi = array(float,[2,2*npix,2*npix]);
+  mi(1:npix,1:npix) = phase;
+  dphi = (mi - mi(1,1))^2;
 
   return dphi; 
 }
