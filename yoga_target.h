@@ -63,10 +63,10 @@ class yoga_target {
 
 };
 
-int launch_raytrace(float *d_odata,float *d_idata,int nx, int ny,float *xref, float *yref, int Nx);
-int launch_fillampli(cuFloatComplex *d_odata,float *d_idata, float *mask,int nx, int ny, int Nx);
-int launch_fillpupil(cuFloatComplex *d_odata, float *mask,int nx, int ny, int Nx);
-int launch_abs2(float *d_odata, cuFloatComplex *d_idata, int nx, int ny);
+int target_raytrace(float *d_odata,float *d_idata,int nx, int ny,float *xref, float *yref, int Nx);
+int fillampli(cuFloatComplex *d_odata,float *d_idata, float *mask,int nx, int ny, int Nx);
+int fillpupil(cuFloatComplex *d_odata, float *mask,int nx, int ny, int Nx);
+int abs2(float *d_odata, cuFloatComplex *d_idata, int nx, int ny);
 int fft_goodsize(long size);
 
 #endif // _YOGA_TARGET_H_

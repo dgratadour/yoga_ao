@@ -10,22 +10,23 @@ using namespace std;
 class yoga_tscreen {
  public:
 
-  yoga_phase             *d_tscreen;     
-  yoga_obj<float>        *d_tscreen_o;     
-  yoga_obj<float>        *d_A;
-  yoga_obj<float>        *d_B;
-  yoga_obj<unsigned int> *d_istencilx;
-  yoga_obj<unsigned int> *d_istencily;
-  yoga_obj<float>        *d_z;
-  yoga_obj<float>        *d_noise;
-  yoga_obj<float>        *d_ytmp;     
-  long                   screen_size;
-  float                  amplitude;
-  float                  altitude;
+  yoga_phase             *d_tscreen;   // The phase screen   
+  yoga_obj<float>        *d_tscreen_o; // Additional space of the same size as the phase screen
+  yoga_obj<float>        *d_A;         // A matrix for extrusion
+  yoga_obj<float>        *d_B;         // B matrix for extrusion
+  yoga_obj<unsigned int> *d_istencilx; // stencil for column extrusion
+  yoga_obj<unsigned int> *d_istencily; // stencil for row extrusion
+  yoga_obj<float>        *d_z;         // tmp array for extrusion process
+  yoga_obj<float>        *d_noise;     // tmp array containing random numbers
+  yoga_obj<float>        *d_ytmp;      // contains the extrude update (row or column)
+  long                   screen_size;  // size of phase screens
+  float                  amplitude;    // amplitude for extrusion (r0^-5/6)
+  float                  altitude;     
   float                  windspeed;
   float                  winddir;
-  float                  deltax;
-  float                  deltay;
+  float                  deltax;       // number of row to extrude per iteration
+  float                  deltay;       // number of row to extrude per iteration
+  //internal
   float                  accumx;
   float                  accumy;
 

@@ -119,6 +119,7 @@ func init_wfs_geom(n,pupil)
   y_wfs(n)._Ntot     = Ntot;
   y_wfs(n)._nrebin   = nrebin;
   y_wfs(n)._qpixsize = qpixsize;
+  y_wfs(n)._subapd   = y_tel.diam/y_wfs(n).nxsub;
   
   if (n == wheremax(y_wfs.nxsub)(1)) {
     //this is the wfs with largest # of subaps
@@ -144,9 +145,10 @@ func init_wfs_geom(n,pupil)
   fluxPerSub = fluxPerSub/pdiam^2.;
   tmp = fluxPerSub > y_wfs(n).fracsub;
   //tmp(where(tmp == 0)) = nvalid+10;
-  y_wfs(n)._validsubs = &int(where2(tmp)); 
-  y_wfs(n)._isvalid   = &int(tmp);
-  y_wfs(n)._nvalid    = sum(*y_wfs(n)._isvalid);
+  y_wfs(n)._validsubs  = &int(where2(tmp)); 
+  y_wfs(n)._isvalid    = &int(tmp);
+  y_wfs(n)._nvalid     = sum(*y_wfs(n)._isvalid);
+  y_wfs(n)._fluxPerSub = &float(fluxPerSub);
 
   
   // this defines how we cut the phase into subaps

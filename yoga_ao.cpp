@@ -774,10 +774,12 @@ __        _______ ____
       long nrebin = ygets_l(argc-5);
       long nfft = ygets_l(argc-6);
       long ntot = ygets_l(argc-7);
-      int  lgs = ygets_l(argc-8);
-      long npup = ygets_l(argc-9);
+      long npup = ygets_l(argc-8);
+      float pdiam = ygets_f(argc-9);
+      float nphot = ygets_f(argc-10);
+      int  lgs = ygets_l(argc-11);
       
-      if (argc > 9) odevice = ygets_i(argc-10);
+      if (argc > 11) odevice = ygets_i(argc-12);
       if (odevice != activeDevice) {
 	if (odevice > _nbDevice()-1) {
 	  cout << "### Invalid Device Id : " << odevice <<" Your system has only " << 
@@ -793,7 +795,7 @@ __        _______ ____
       wfs_struct *handle=(wfs_struct *)ypush_obj(&yWfs, sizeof(wfs_struct));
       handle->device = odevice;
       
-      handle->yoga_wfs = new yoga_wfs(nxsub,nvalid,npix,nphase,nrebin,nfft,ntot,lgs,npup);
+      handle->yoga_wfs = new yoga_wfs(nxsub,nvalid,npix,nphase,nrebin,nfft,ntot,npup,pdiam,nphot,lgs);
       
     } catch ( string msg ) {
       y_error(msg.c_str());
@@ -818,13 +820,19 @@ __        _______ ____
    float lambda = ygets_f(argc-4);
    float mag    = ygets_f(argc-5);
    long  size   = ygets_l(argc-6);
+   float noise = -1;
+   long seed = 1234;
+   if (argc>6)
+     noise = ygets_f(argc-7);
+   if (argc>7)
+     seed = ygets_l(argc-8);
    
    if (handle->device != activeDevice) {
      yoga_setDevice(handle->device);
    }
    
    yoga_wfs *wfs_handler = (yoga_wfs *)handle->yoga_wfs;
-   wfs_handler->wfs_initgs(xpos,ypos,lambda,mag,size);
+   wfs_handler->wfs_initgs(xpos,ypos,lambda,mag,size,noise,seed);
  }
 
 
@@ -900,11 +908,16 @@ __        _______ ____
 
       long *ntota = ygeta_l(argc-8, &ntot,dims);
 
-      int *lgs = ygeta_i(argc-9, &ntot,dims);
+      long npup = ygets_l(argc-9);
 
-      long npup = ygets_l(argc-10);
+      float *pdiam = ygeta_f(argc-10, &ntot,dims);
 
-      if (argc > 10) odevice = ygets_i(argc-11);
+      float *nphot = ygeta_f(argc-11, &ntot,dims);
+
+      int *lgs = ygeta_i(argc-12, &ntot,dims);
+
+
+      if (argc > 12) odevice = ygets_i(argc-13);
       if (odevice != activeDevice) {
 	if (odevice > _nbDevice()-1) {
 	  cout << "### Invalid Device Id : " << odevice <<" Your system has only " << 
@@ -920,7 +933,7 @@ __        _______ ____
       sensors_struct *handle=(sensors_struct *)ypush_obj(&ySensors, sizeof(sensors_struct));
       handle->device = odevice;
       
-      handle->yoga_sensors = new yoga_sensors(nsensors,nxsub,nvalid,npix,nphase,nrebin,nfft,ntota,lgs,npup);
+      handle->yoga_sensors = new yoga_sensors(nsensors,nxsub,nvalid,npix,nphase,nrebin,nfft,ntota,npup,pdiam,nphot,lgs);
       
     } catch ( string msg ) {
       y_error(msg.c_str());
@@ -956,7 +969,17 @@ __        _______ ____
      yoga_setDevice(handle->device);
    }
    
-   sensors_handler->sensors_initgs(xpos,ypos,lambda,mag,size);
+   if (argc > 7) {
+     float  *noise = ygeta_f(argc-7, &ntot,dims);
+     long   *seed   = ygeta_l(argc-8, &ntot,dims);
+     sensors_handler->sensors_initgs(xpos,ypos,lambda,mag,size,noise,seed);
+   } else if (argc > 6) {
+     float  *noise = ygeta_f(argc-7, &ntot,dims);
+     sensors_handler->sensors_initgs(xpos,ypos,lambda,mag,size,noise);
+   } else {
+     sensors_handler->sensors_initgs(xpos,ypos,lambda,mag,size);
+
+   }
  }
 
   void
@@ -1003,8 +1026,9 @@ __        _______ ____
     int *binmap = ygeta_i(argc-6, &ntot,dims);
     float *offsets = ygeta_f(argc-7, &ntot,dims);
     float *pupil = ygeta_f(argc-8, &ntot,dims);
+    float *fluxPerSub = ygeta_f(argc-9, &ntot,dims);
 
-    sensors_handler->d_wfs.at(nsensor)->wfs_initarrays(phasemap,hrmap,imamap,binmap,offsets,pupil);
+    sensors_handler->d_wfs.at(nsensor)->wfs_initarrays(phasemap,hrmap,imamap,binmap,offsets,pupil,fluxPerSub);
   }
 
   void
@@ -1025,10 +1049,23 @@ __        _______ ____
   }
 
   void
-  Y_sensors_compimg(int argc)
+  Y_sensors_initnmax(int argc)
   {    
-    long ntot;
-    long dims[Y_DIMSIZE];
+    sensors_struct *handler = (sensors_struct *)yget_obj(argc-1,&ySensors);
+    yoga_sensors *sensors_handler = (yoga_sensors *)(handler->yoga_sensors);
+
+    if (handler->device != activeDevice) yoga_setDevice(handler->device);
+
+    int nsensor = ygets_i(argc-2);
+
+    int nmax = ygets_i(argc-3);
+
+    sensors_handler->d_wfs.at(nsensor)->init_nmax(nmax);
+  }
+
+  void
+  Y_sensors_trace(int argc)
+  {    
     sensors_struct *handler = (sensors_struct *)yget_obj(argc-1,&ySensors);
     yoga_sensors *sensors_handler = (yoga_sensors *)(handler->yoga_sensors);
 
@@ -1039,7 +1076,73 @@ __        _______ ____
 
     if (handler->device != activeDevice) yoga_setDevice(handler->device);
 
-    sensors_handler->d_wfs.at(nsensor)->comp_image(atmos_handler,handler->device);
+    sensors_handler->d_wfs.at(nsensor)->sensor_trace(atmos_handler);
+  }
+
+  void
+  Y_sensors_compimg(int argc)
+  {    
+    sensors_struct *handler = (sensors_struct *)yget_obj(argc-1,&ySensors);
+    yoga_sensors *sensors_handler = (yoga_sensors *)(handler->yoga_sensors);
+
+    int nsensor = ygets_i(argc-2);
+
+    if (handler->device != activeDevice) yoga_setDevice(handler->device);
+
+    sensors_handler->d_wfs.at(nsensor)->comp_image(handler->device);
+  }
+
+  void
+  Y_slopes_geom(int argc)
+  {    
+    sensors_struct *handler = (sensors_struct *)yget_obj(argc-1,&ySensors);
+    yoga_sensors *sensors_handler = (yoga_sensors *)(handler->yoga_sensors);
+
+    int nsensor = ygets_i(argc-2);
+
+    int type = ygets_i(argc-3);
+
+    if (handler->device != activeDevice) yoga_setDevice(handler->device);
+
+    sensors_handler->d_wfs.at(nsensor)->slopes_geom(type);
+  }
+
+  void
+  Y_sensors_compslopes(int argc)
+  {    
+    sensors_struct *handler = (sensors_struct *)yget_obj(argc-1,&ySensors);
+    yoga_sensors *sensors_handler = (yoga_sensors *)(handler->yoga_sensors);
+
+    int nsensor = ygets_i(argc-2);
+    if (handler->device != activeDevice) yoga_setDevice(handler->device);
+
+    int type = 0;
+    if (argc>2) type = ygets_i(argc-3);
+
+    if (type == 0) sensors_handler->d_wfs.at(nsensor)->get_cog();
+    else if (type == 1) {
+      int nmax = 0;
+      if (argc>3) nmax = ygets_i(argc-4);
+      sensors_handler->d_wfs.at(nsensor)->get_bpcog(nmax);
+    } else if (type == 2) {
+      float thresh = 0.;
+      if (argc>3) thresh = ygets_f(argc-4);
+      sensors_handler->d_wfs.at(nsensor)->get_tcog(thresh);
+    }
+
+  }
+
+  void
+  Y_sensors_getnmax(int argc)
+  {    
+    sensors_struct *handler = (sensors_struct *)yget_obj(argc-1,&ySensors);
+    yoga_sensors *sensors_handler = (yoga_sensors *)(handler->yoga_sensors);
+
+    if (handler->device != activeDevice) yoga_setDevice(handler->device);
+
+    int nsensor = ygets_i(argc-2);
+
+    sensors_handler->d_wfs.at(nsensor)->get_nmax();
   }
 
   void
@@ -1054,6 +1157,20 @@ __        _______ ____
 
     float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_binimg->dims_data);
     sensors_handler->d_wfs.at(nsensor)->d_binimg->device2host(data);
+  }
+
+  void
+  Y_sensors_getslopes(int argc)
+  {    
+    sensors_struct *handler = (sensors_struct *)yget_obj(argc-1,&ySensors);
+    yoga_sensors *sensors_handler = (yoga_sensors *)(handler->yoga_sensors);
+
+    if (handler->device != activeDevice) yoga_setDevice(handler->device);
+
+    int nsensor = ygets_i(argc-2);
+
+    float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_slopes->dims_data);
+    sensors_handler->d_wfs.at(nsensor)->d_slopes->device2host(data);
   }
 
   void
@@ -1107,6 +1224,22 @@ __        _______ ____
       memcpy(&ndims_data[2],&(sensors_handler->d_wfs.at(nsensor)->d_ftlgskern->getDims()[1]),sizeof(long)*3);
       float *data = ypush_f(ndims_data);
       sensors_handler->d_wfs.at(nsensor)->d_ftlgskern->device2host((cuFloatComplex *)data);
+    }
+    if (strcmp(type_data, "subsum")==0) {
+      float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_subsum->dims_data);
+      sensors_handler->d_wfs.at(nsensor)->d_subsum->device2host(data);
+    }
+    if (strcmp(type_data, "slopes")==0) {
+      float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_slopes->dims_data);
+      sensors_handler->d_wfs.at(nsensor)->d_slopes->device2host(data);
+    }
+    if (strcmp(type_data, "validp")==0) {
+      float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_validpix->dims_data);
+      sensors_handler->d_wfs.at(nsensor)->d_validpix->device2host(data);
+    }
+    if (strcmp(type_data, "validi")==0) {
+      int *data = ypush_i(sensors_handler->d_wfs.at(nsensor)->d_validindx->dims_data);
+      sensors_handler->d_wfs.at(nsensor)->d_validindx->device2host(data);
     }
 
   }

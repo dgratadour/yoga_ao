@@ -60,6 +60,7 @@ struct wfs_struct
   float gsalt;     // altitude of guide star (in m) 0 if ngs 
   float gsmag;     // magnitude of guide star
   float zerop;     // detector zero point
+  float noise;     // desired noise : < 0 = no noise / 0 = photon only / > 0 photon + ron 
   
   // lgs only
   float lgsreturnperwatt;  // return per watt factor (high season : 10 ph/cm2/s/W)
@@ -76,8 +77,10 @@ struct wfs_struct
   long  _nrebin;         // rebin factor from hr to binned image for a subap 
   long  _nvalid;         // number of valid subaps
 
-  float _nphotons;       // number of photons per subap
-  float _qpixsize;       // quantum pixel size for the simulation
+  float   _nphotons;     // number of photons per subap
+  float   _subapd;       // subap diameter (m)
+  pointer _fluxPerSub;   // fraction of nphotons per subap
+  float   _qpixsize;     // quantum pixel size for the simulation
   
   pointer _istart;       // x start indexes for cutting phase screens 
   pointer _jstart;       // y start indexes for cutting phase screens 

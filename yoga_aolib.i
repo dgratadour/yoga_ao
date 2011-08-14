@@ -173,7 +173,7 @@ extern phase_set;
 // wfs
 extern yoga_wfs;
 /* DOCUMENT yoga_wfs
-   obj = yoga_wfs(nxsub,nvalid,npix,nphase,nrebin,nfft,ntot,lgs,npup[,ndevice])
+   obj = yoga_wfs(nxsub,nvalid,npix,nphase,nrebin,nfft,ntot,npup,pdiam,nphot,lgs[,ndevice])
      
    creates an yWfs object on the gpu
    nxsub  : linear # of subaps
@@ -183,8 +183,10 @@ extern yoga_wfs;
    nrebin : rebin factor from hr img to cam pixels
    nfft   : linear size of fft arrays for psf computations for a subap
    ntot   : linear size of hr image (total FoV) for a subap
-   lgs    : flag for lgs mode : 1 if lgs wfs
    npup   : linear size of total pupil image
+   pdiam  : linear diameter of a subap (m)
+   nphot  : number of photons for a subap
+   lgs    : flag for lgs mode : 1 if lgs wfs
       
    SEE ALSO:
  */
@@ -204,7 +206,7 @@ extern wfs_initgs;
  */
 extern yoga_sensors;
 /* DOCUMENT yoga_sensors
-   obj = yoga_sensors(nsensors,nxsub,nvalid,npix,nphase,nrebin,nfft,ntot,lgs,npup[,ndevice])
+   obj = yoga_sensors(nsensors,nxsub,nvalid,npix,nphase,nrebin,nfft,ntot,npup,pdiam,nphot,lgs[,ndevice])
      
    creates an ySensors object on the gpu
    nsensors : # of wfs
@@ -215,8 +217,10 @@ extern yoga_sensors;
    nrebin   : array of rebin factors from hr img to cam pixels
    nfft     : array of linear sizes of fft arrays for psf computations for a subap
    ntot     : array of linear sizes of hr image (total FoV) for a subap
-   lgs      : array of flags for lgs mode : 1 if lgs wfs
    npup     : array of linear sizes of total pupil image
+   pdiam    : linear diameter of a subap (m)
+   nphot    : number of photons for a subap
+   lgs      : array of flags for lgs mode : 1 if lgs wfs
       
    SEE ALSO:
  */
@@ -271,12 +275,35 @@ extern sensors_initarr;
  */
 extern sensors_compimg;
 /* DOCUMENT sensors_compimg
-   sensors_compimg,yoga_sensors_obj,nsensor,yoga_atmos_obj
+   sensors_compimg,yoga_sensors_obj,nsensor
      
-   image computation for a given sensor in a ySensors object and given turbulence in an yAtmos object
+   image computation for a given sensor in a ySensors object
    yoga_sensors_obj : the ySensors object
    nsensor          : index of given wfs
-   yoga_atmos_obj   : the yAtmos object
+
+   SEE ALSO:
+ */
+extern slopes_geom;
+/* DOCUMENT slopes_geom
+   slopes_geom,yoga_sensors_obj,nsensor,lambOverD
+     
+   geometric slopes computation for a given sensor in a ySensors object
+   yoga_sensors_obj : the ySensors object
+   nsensor          : index of given wfs
+   lambOverD        : lambda over d for one subap
+
+   SEE ALSO:
+ */
+extern sensors_compslopes;
+/* DOCUMENT sensors_compslopes
+   sensors_compslopes,yoga_sensors_obj,nsensor[,method,nmax/threshold]
+     
+   general slopes computation for a given sensor in a ySensors object
+   yoga_sensors_obj : the ySensors object
+   nsensor          : index of given wfs
+   method           : centroiding method : 0=cog (default) / 1=bpcog / 2=tcog / 3=wcog
+   nmax             : nmax brightest pixels
+   threshold        : threshold value
 
    SEE ALSO:
  */
@@ -285,6 +312,16 @@ extern sensors_getimg;
    img = sensors_getimg(yoga_sensors_obj,nsensor)
      
    returns the total image for a given sensor in a ySensors object
+   yoga_sensors_obj : the ySensors object
+   nsensor          : index of given wfs
+
+   SEE ALSO:
+ */
+extern sensors_getslopes;
+/* DOCUMENT sensors_getslopes
+   slopes = sensors_getslopes(yoga_sensors_obj,nsensor)
+     
+   returns the slopes for a given sensor in a ySensors object
    yoga_sensors_obj : the ySensors object
    nsensor          : index of given wfs
 
@@ -315,6 +352,29 @@ extern sensors_loadkernels;
    SEE ALSO:
  */
 
+extern sensors_initnmax;
+/* DOCUMENT sensors_initnmax
+   sensors_initnmax,yoga_sensors_obj,nsensor,nmax
+     
+   init structures for nmax brightest pixels centroiding for a given sensor in a ySensors object
+   yoga_sensors_obj : the ySensors object
+   nsensor          : index of given wfs
+   nmax             : nmax brightest pixels
+
+   SEE ALSO:
+ */
+
+extern sensors_getnmax;
+/* DOCUMENT sensors_getnmax
+   sensors_getnmax,yoga_sensors_obj,nsensor
+     
+   search for nmax brightest pixels per subap for a given sensor in a ySensors object
+   yoga_sensors_obj : the ySensors object
+   nsensor          : index of given wfs
+
+   SEE ALSO:
+ */
+
 // global
 extern move_atmos;
 /* DOCUMENT move_atmos
@@ -329,6 +389,17 @@ extern move_sky;
    move_sky,yoga_atmos_obj,yoga_target_obj
      
    multi-layer & multi-target extrude process for a yAtmos object and a yTarget object
+
+   SEE ALSO:
+ */
+extern sensors_trace;
+/* DOCUMENT sensors_trace
+   sensors_trace,yoga_sensors_obj,nsensor,yoga_atmos_obj
+     
+   do raytracing for a given sensor in a ySensors object and given turbulence in an yAtmos object
+   yoga_sensors_obj : the ySensors object
+   nsensor          : index of given wfs
+   yoga_atmos_obj   : the yAtmos object
 
    SEE ALSO:
  */

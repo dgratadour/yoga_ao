@@ -162,7 +162,8 @@ class wfs:
       zp         = self.glade.get_widget('zp').get_value()
       throughput = self.glade.get_widget('throughput').get_value()
       lambdai    = self.glade.get_widget('lambda').get_value()
-      self.py2yo('init_wfs_prop %d %d %d %f %f %f %f %f %f %f %f' % (nwfs,nsub,npix,pixsize,mag,xpos,ypos,lambdai,frac,zp,throughput))
+      noise      = self.glade.get_widget('noise').get_value()
+      self.py2yo('init_wfs_prop %d %d %d %f %f %f %f %f %f %f %f %f' % (nwfs,nsub,npix,pixsize,mag,xpos,ypos,lambdai,frac,zp,throughput,noise))
       if (lgsf):
          gsalt    = self.glade.get_widget('lgsalt').get_value()
          lltx     = self.glade.get_widget('lltx').get_value()
@@ -176,7 +177,7 @@ class wfs:
    def y_init_wfs(self,dummy):
       self.py2yo('create_wfs %d' % (1))
 
-   def y_update_wfs_gui(self,nsub,npix,pixsize,frac,xpos,ypos,lambdai,mag,zp,thhroughput):
+   def y_update_wfs_gui(self,nsub,npix,pixsize,frac,xpos,ypos,lambdai,mag,zp,thhroughput,noise):
       self.glade.get_widget('nsub').set_value(nsub)
       self.glade.get_widget('npix').set_value(npix)
       self.glade.get_widget('pixsize').set_value(pixsize)
@@ -187,6 +188,7 @@ class wfs:
       self.glade.get_widget('mag').set_value(mag)
       self.glade.get_widget('zp').set_value(zp)
       self.glade.get_widget('throughput').set_value(thhroughput)
+      self.glade.get_widget('noise').set_value(noise)
 
    def on_nwfs_value_changed(self,wdg):
       nwfs = wdg.get_value()

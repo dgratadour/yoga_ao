@@ -53,16 +53,17 @@ func update_wfs_prop(numwfs)
   } else {
     if (numwfs > numberof(y_wfs)) error,"not a valid target";
     else {
-      pyk,swrite(format=wfs_disp._cmd+"y_update_wfs_gui(%d, %d, %f, %f, %f, %f, %f, %f, %f, %f)",
+      pyk,swrite(format=wfs_disp._cmd+"y_update_wfs_gui(%d, %d, %f, %f, %f, %f, %f, %f, %f, %f, %f)",
                  (y_wfs.nxsub)(numwfs),(y_wfs.npix)(numwfs),
                  (y_wfs.pixsize)(numwfs),(y_wfs.fracsub)(numwfs),
                  (y_wfs.xpos)(numwfs),(y_wfs.ypos)(numwfs),(y_wfs.lambda)(numwfs),
-                 (y_wfs.gsmag)(numwfs),log10((y_wfs.zerop)(numwfs)),(y_wfs.optthroughput)(numwfs));
+                 (y_wfs.gsmag)(numwfs),log10((y_wfs.zerop)(numwfs)),
+                 (y_wfs.optthroughput)(numwfs),(y_wfs.noise)(numwfs));
     }
   }
 }
 
-func init_wfs_prop(numwfs,nsub,npix,pixsize,mag,xpos,ypos,lambda,frac,zp,throughput)
+func init_wfs_prop(numwfs,nsub,npix,pixsize,mag,xpos,ypos,lambda,frac,zp,throughput,noise)
 {
   extern y_wfs;
 
@@ -78,6 +79,7 @@ func init_wfs_prop(numwfs,nsub,npix,pixsize,mag,xpos,ypos,lambda,frac,zp,through
     y_wfs(numwfs).gsmag         = mag;
     y_wfs(numwfs).optthroughput = throughput;
     y_wfs(numwfsxs).zerop       = 10^zp;
+    y_wfs(numwfsxs).noise       = noise;
   }
 }
 
@@ -122,6 +124,7 @@ func create_wfs(numwfs)
       y_wfs(i).gsmag         = 5.;
       y_wfs(i).optthroughput = 0.5;
       y_wfs(i).zerop         = 1.e11;
+      y_wfs(i).noise         = -1;
   }
   
   for (cc=1;cc<=100;cc++)
@@ -153,6 +156,7 @@ func update_nwfs(numwfs)
       y_wfs(0).gsmag           = 5.;
       y_wfs(0).optthroughput = 0.5;
       y_wfs(0).zerop         = 1.e11;
+      y_wfs(0).noise         = -1;
       
       pyk,swrite(format=wfs_disp._cmd+"glade.get_widget('wfs_select').insert_text(%d,'%s')",
                  numberof(y_wfs)-1,swrite(format="WFS # %d",numberof(y_wfs)));
@@ -210,6 +214,7 @@ func load_default_wfs(tconf)
     y_wfs(1).gsmag         = 5.;
     y_wfs(1).optthroughput = 0.5;
     y_wfs(1).zerop         = 1.e11;
+    y_wfs(1).noise         = -1;
   }
   if (tconf < 8) {
     for (cc=1;cc<=100;cc++)
@@ -248,7 +253,10 @@ func wfs_loop(one)
     //if (g_target == []) extrude_tscreen,g_atmos,(*y_atmos.alt)(1);
     move_atmos,g_atmos;
     if ((y_wfs != []) && (g_wfs != [])) {
-      for (i=1;i<=numberof(y_wfs);i++) sensors_compimg,g_wfs,i-1,g_atmos;
+      for (i=1;i<=numberof(y_wfs);i++) {
+        sensors_trace,g_wfs,i-1,g_atmos;
+        sensors_compimg,g_wfs,i-1;
+      }
     }
     
     if (wfsdisp_type != [])
@@ -365,14 +373,16 @@ func update_main(type,nlayer)
   }
   
   if (type == "Phase - WFS") {
-    sensors_compimg,g_wfs,nlayer,g_atmos;
+    sensors_trace,g_wfs,nlayer,g_atmos;
+    //sensors_compimg,g_wfs,nlayer;
     mscreen = sensors_getdata(g_wfs,nlayer,"phase");
     window,(*wfs_disp._wins)(1);fma;
     pli,mscreen;
   }
   
   if (type == "Image - WFS") {
-    sensors_compimg,g_wfs,nlayer,g_atmos;
+    sensors_trace,g_wfs,nlayer,g_atmos;
+    sensors_compimg,g_wfs,nlayer;
     mscreen = sensors_getimg(g_wfs,nlayer);
     window,(*wfs_disp._wins)(1);fma;
     pli,mscreen;

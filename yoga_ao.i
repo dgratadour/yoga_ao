@@ -172,13 +172,12 @@ func wfs_init(void)
       init_wfs_geom,i;
     }
   }
+  g_wfs = yoga_sensors(numberof(y_wfs),y_wfs.nxsub,y_wfs._nvalid,y_wfs.npix,y_wfs._pdiam,y_wfs._nrebin,y_wfs._Nfft,y_wfs._Ntot,y_geom._n,y_wfs._subapd,y_wfs._nphotons,y_wfs.gsalt > 0);
   
-  g_wfs = yoga_sensors(numberof(y_wfs),y_wfs.nxsub,y_wfs._nvalid,y_wfs.npix,y_wfs._pdiam,y_wfs._nrebin,y_wfs._Nfft,y_wfs._Ntot,y_wfs.gsalt > 0,y_geom._n);
-  
-  sensors_initgs,g_wfs,y_wfs.xpos,y_wfs.ypos,y_wfs.lambda,y_wfs.gsmag,(y_geom._n)(-::numberof(y_wfs)-1);
+  sensors_initgs,g_wfs,y_wfs.xpos,y_wfs.ypos,y_wfs.lambda,y_wfs.gsmag,(y_geom._n)(-::numberof(y_wfs)-1),y_wfs.noise;
   
   for (i=1;i<=numberof(y_wfs);i++) {
-    sensors_initarr,g_wfs,i-1,int(*y_wfs(i)._phasemap),int(*y_wfs(i)._hrmap),int(*y_wfs(i)._imamap),int(*y_wfs(i)._binmap),complex(*y_wfs(i)._halfxy),float(*y_geom._mpupil);
+    sensors_initarr,g_wfs,i-1,int(*y_wfs(i)._phasemap),int(*y_wfs(i)._hrmap),int(*y_wfs(i)._imamap),int(*y_wfs(i)._binmap),complex(*y_wfs(i)._halfxy),float(*y_geom._mpupil),(*y_wfs(1)._fluxPerSub)(where(*y_wfs(1)._isvalid));
   }
 
   // lgs case

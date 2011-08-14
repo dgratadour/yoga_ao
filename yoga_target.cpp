@@ -109,7 +109,7 @@ int yoga_source::raytrace(yoga_atmos *yatmos)
       ps = yatmos->d_screens.find(alt);
    
       if (ps != yatmos->d_screens.end())
-	launch_raytrace(this->d_phase->d_screen->d_data,
+	target_raytrace(this->d_phase->d_screen->d_data,
 			ps->second->d_tscreen->d_screen->d_data,
 			(int)d_phase->d_screen->dims_data[1],
 			(int)d_phase->d_screen->dims_data[2],
@@ -127,18 +127,18 @@ int yoga_source::comp_image(float *mask)
 {
   cutilSafeCall(cudaMemset(this->d_amplipup->d_data, 0,sizeof(cuFloatComplex)*this->d_amplipup->nb_elem));
   
-  launch_fillampli(this->d_amplipup->d_data,this->d_phase->d_screen->d_data, mask,this->d_phase->d_screen->dims_data[1], 
+  fillampli(this->d_amplipup->d_data,this->d_phase->d_screen->d_data, mask,this->d_phase->d_screen->dims_data[1], 
 		   this->d_phase->d_screen->dims_data[2],this->d_amplipup->dims_data[1]);
   
   /*
-  launch_fillpupil(this->d_amplipup->d_data, mask, this->d_phase->d_screen->dims_data[1], 
+  fillpupil(this->d_amplipup->d_data, mask, this->d_phase->d_screen->dims_data[1], 
 		   this->d_phase->d_screen->dims_data[2], this->d_amplipup->dims_data[1]);
   */
   
   yoga_fft(this->d_amplipup->d_data,this->d_amplipup->d_data,1,this->d_amplipup->plan);
   
   
-  launch_abs2(this->d_image->d_data,this->d_amplipup->d_data,this->d_image->dims_data[1],
+  abs2(this->d_image->d_data,this->d_amplipup->d_data,this->d_image->dims_data[1],
 	      this->d_image->dims_data[2]);
   
   return EXIT_SUCCESS;

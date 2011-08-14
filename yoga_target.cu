@@ -78,7 +78,7 @@ __global__ void raytrace_krnl(float *odata, float *idata, int nx, int ny,float *
 }
 
 
-int launch_raytrace(float *d_odata,float *d_idata,int nx, int ny,float *xref, float *yref, int Nx)
+int target_raytrace(float *d_odata,float *d_idata,int nx, int ny,float *xref, float *yref, int Nx)
 {
 
   int nnx = nx + BLOCK_SZ - nx%BLOCK_SZ; // find next multiple of BLOCK_SZ
@@ -118,7 +118,7 @@ __global__ void fillampli_krnl(cuFloatComplex *odata, float *idata, float *mask,
 }
 
 
-int launch_fillampli(cuFloatComplex *d_odata,float *d_idata, float *mask,int nx, int ny, int Nx)
+int fillampli(cuFloatComplex *d_odata,float *d_idata, float *mask,int nx, int ny, int Nx)
 {
 
   int nnx = nx + BLOCK_SZ - nx%BLOCK_SZ;
@@ -158,7 +158,7 @@ __global__ void fillpupil_krnl(cuFloatComplex *odata, float *mask, int nx, int n
 }
 
 
-int launch_fillpupil(cuFloatComplex *d_odata,float *mask,int nx, int ny, int Nx)
+int fillpupil(cuFloatComplex *d_odata,float *mask,int nx, int ny, int Nx)
 {
 
   int nnx = nx + BLOCK_SZ - nx%BLOCK_SZ;
@@ -193,7 +193,7 @@ __global__ void abs2_krnl(float *odata, cuFloatComplex *idata, int nx, int ny)
 }
 
 
-int launch_abs2(float *d_odata, cuFloatComplex *d_idata, int nx, int ny)
+int abs2(float *d_odata, cuFloatComplex *d_idata, int nx, int ny)
 {
 
   int nnx = nx + BLOCK_SZ - nx%BLOCK_SZ;
