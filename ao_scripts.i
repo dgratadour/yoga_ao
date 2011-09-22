@@ -14,6 +14,66 @@ mkdirp,YOGA_AO_SAVEPATH;
 YOGA_AO_PARPATH = YOGA_AO_SAVEPATH+"/par/";
 mkdirp,YOGA_AO_PARPATH;
 
+func script_atmos_full(void)
+{
+  extern y_geom,y_tel,y_loop,y_atmos;
+  extern g_atmos,g_target;
+  extern ipupil;
+
+  tabres = array(0.0f,4,4);
+
+  filenames = [["atmos_1layer.par","atmos_1layer_vlt.par","atmos_1layer_20m.par","atmos_1layer_elt.par"],["atmos_1layer_5targets.par","atmos_1layer_vlt_5targets.par","atmos_1layer_20m_5targets.par","atmos_1layer_elt_5targets.par"],["atmos_4layers.par","atmos_4layers_vlt.par","atmos_4layers_20m.par","atmos_4layers_elt.par"],["atmos_12layers.par","atmos_12layers_vlt.par","atmos_12layers_20m.par","atmos_12layers_elt.par"]];
+                 
+  for (i=1;i<=4;i++) {
+    for (j=1;j<=4;j++) {
+      read_parfile,YOGA_AO_PARPATH+filenames(j,i);
+
+      if (y_loop.niter == []) y_loop.niter = 1000;
+      
+      //here we just simulate atmosphere so pupdiam is fixed
+      // arbitrarily.
+      pupdiam = long(2*y_tel.diam*20.); // we assume subaps of 50cm and 20 phase pix per subaps
+
+      write,"Doing atmos inits on the GPU";
+  
+      geom_init,pupdiam;
+      
+      atmos_init;
+      
+      write,"... Done !";
+      
+      write,"Creating targets on the GPU";
+      
+      target_init;
+      
+      write,"... Done !";
+      
+      write,format="Starting loop on : %d iterations\n",y_loop.niter;
+      
+      mytime = tic();
+      for (cc=1;cc<=y_loop.niter;cc++) {
+        //tinter = tic();
+        move_sky,g_atmos,g_target;
+        /*
+        if (cc % 10 == 0) {
+          time_move = tac(mytime)/cc;
+          //write,format="\r Estimated remaining time : %.2f s",(y_loop.niter - cc)*time_move;
+        }
+        */
+      }
+      write,"... Done !";
+      // first dim is the telescope size
+      // second dim is the type of parfile
+      tabres(j,i) = tac(mytime)/y_loop.niter;
+      
+      //write,format="Average atmos move gpu time : %.4f s\n",tac(mytime)/y_loop.niter;
+    }
+  }
+  return tabres;
+}
+
+
+
 func script_atmos(filename)
 {
   extern y_geom,y_tel,y_loop,y_atmos;
@@ -64,7 +124,7 @@ func script_atmos(filename)
   }
   write,"... Done !";
   write,format="Average atmos move gpu time : %.4f s\n",tac(mytime)/y_loop.niter;
-  
+
   write,"Doing atmos inits on the CPU";
 
   pupixsize = y_tel.diam / y_geom.pupdiam;
@@ -254,13 +314,17 @@ func script_atmoscpu(void)
   plg,circavg_quad(dphi_cpu3(1:pupdiam,1:pupdiam))/niter,color="yellow",marks=0,width=4;
 }
 
-func script_wfs(filename,typeslp)
+func script_wfs(filename,typeslp,verbose=)
 {
 
+  activeDevice,1;
+  
   extern y_geom,y_tel,y_loop,y_atmos,y_wfs;
   extern g_atmos,g_target,g_wfs;
   extern ipupil;
 
+  if (verbose == []) verbose = 1;
+  
   if (filename == []) filename = YOGA_AO_PARPATH+"atmos_1layer.par";
   //if (filename == []) filename = YOGA_AO_PARPATH+"atmos_12layers.par";
 
@@ -282,9 +346,9 @@ func script_wfs(filename,typeslp)
  
   target_init;
 
-  write,"... Done with inits !";
+  if (verbose) write,"... Done with inits !";
 
-  write,format="Starting loop on : %d iterations\n",y_loop.niter;
+  if (verbose) write,format="Starting loop on : %d iterations\n",y_loop.niter;
   
   mytime = tic();
   for (cc=1;cc<=y_loop.niter;cc++) {
@@ -303,16 +367,68 @@ func script_wfs(filename,typeslp)
         }
       }
     }
-    if (cc % 10 == 0) {
-      time_move = tac(mytime)/cc;
-      write,format="\r Estimated remaining time : %.2f s",(y_loop.niter - cc)*time_move;
+    if (verbose) { 
+      if (cc % 10 == 0) {
+        time_move = tac(mytime)/cc;
+        write,format="\r Estimated remaining time : %.2f s",(y_loop.niter - cc)*time_move;
+      }
     }
   }
-  write,"... Done !";
-  write,format="Average wfs gpu time : %.4f s\n",tac(mytime)/y_loop.niter;
-  
+
+  if (verbose) {
+    write,"... Done !";
+    write,format="Average wfs gpu time : %.4f s\n",tac(mytime)/y_loop.niter;
+  }
+
+  return tac(mytime)/y_loop.niter;
 }
 
+/*
+// results
+naos-like
+diam=[4.,8.,20.,40.]
+["1wfs8x8_1layer","1wfs1x16_1layer","1wfs40x40_1layer","1wfs80x80_1layer",]
+4m          - 8m       - 20m      - 40m
+naos1 = [0.000454419, 0.00117409, 0.0052497,  0.0253246]
+naos2 = [0.000467373, 0.0011995,  0.00536267, 0.0257187]
+naos3 = [0.000485916, 0.00128136, 0.00581861, 0.027374]
+naos4 = [0.000470978, 0.00120419, 0.00538718, 0.0264424]
+naos5 = [0.000496864, 0.00126634, 0.00575755, 0.0314704]
+naos6 = [0.000473632, 0.001206,   0.00539444, 0.0263731]
+
+naos-lgs-like
+["1wfs8x8_1layer_lgs","1wfs1x16_1layer_lgs","1wfs40x40_1layer_lgs","1wfs80x80_1layer_lgs",]
+4m          - 8m       - 20m     - 40m
+naosLgs1 = [0.000763339, 0.00229221, 0.0121887, 0.218376]
+naosLgs2 = [0.00077659 , 0.00231758, 0.0123006, 0.21854]
+naosLgs3 = [0.00079519 , 0.0024001 , 0.0127567, 0.220232]
+naosLgs4 = [0.000780166, 0.00232536, 0.01233  , 0.219253]
+naosLgs5 = [0.000806483, 0.00238409, 0.0127017, 0.224476]
+naosLgs6 = [0.000781823, 0.00232588, 0.0123366, 0.219242]
+
+sphere-like
+["sphere4m_1layer","sphere_1layer","sphere20m_1layer","sphere40m_1layer",]
+4m          - 8m        - 20m      - 40m
+sphere1 = [0.000343465, 0.000730022, 0.00327722, 0.0116978]
+sphere2 = [0.000368606, 0.000797327, 0.0036923 , 0.0133116]
+sphere3 = [0.000372487, 0.000863224, 0.00408113, 0.0148787]
+sphere4 = [0.000374008, 0.000853045, 0.00405633, 0.014764]
+sphere5 = [0.000432512, 0.0012298  , 0.00637453, 0.0240691]
+sphere6 = [0.000377101, 0.000860718, 0.00405923, 0.0147827]
+
+
+canary-like
+["canary_1layer","canary8m_1layer","canary20m_1layer","canary40m_1layer",]
+4m         - 8m       - 20m     - 40m
+canary1 = [0.0021683 , 0.00573891, 0.0286964, 0.109454]
+canary2 = [0.00222212, 0.00583664, 0.0291034, 0.110974]
+canary3 = [0.00230654, 0.00608467, 0.0308139, 0.117758]
+canary4 = [0.0022471 , 0.0059265 , 0.0298238, 0.113827]
+canary5 = [0.00246509, 0.00669579, 0.03499  , 0.134702]
+canary6 = [0.0022514 , 0.0059298 , 0.0297773, 0.113609]
+
+
+*/
 
 func check_centroiding(void)
 {

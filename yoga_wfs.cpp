@@ -91,15 +91,15 @@ yoga_wfs::yoga_wfs(long nxsub, long nvalid, long npix, long nphase, long nrebin,
   dims_data1[1] = 2*nvalid;
   this->d_slopes = new yoga_obj<float>(dims_data1);
 
-  this->d_validpix = NULL;
-  this->d_validindx = NULL;
+  this->d_validpix = 0L;
+  this->d_validindx = 0L;
 
-  this->d_weight = NULL;
+  this->d_weight = 0L;
 
-  this->d_corrfct  = NULL;
-  this->d_corrfft1 = NULL;
-  this->d_corrfft2 = NULL;
-  this->d_corrnorm = NULL;
+  this->d_corrfct  = 0L;
+  this->d_corrfft1 = 0L;
+  this->d_corrfft2 = 0L;
+  this->d_corrnorm = 0L;
 
 
 }
@@ -128,16 +128,16 @@ yoga_wfs::~yoga_wfs()
     delete  this->d_ftlgskern;
   }
 
-  if (this->d_validpix != NULL) delete this->d_validpix;
-  if (this->d_validindx!= NULL) delete this->d_validindx;
+  if (this->d_validpix != 0L) delete this->d_validpix;
+  if (this->d_validindx!= 0L) delete this->d_validindx;
 
-  if (this->d_weight != NULL) delete this->d_weight;
+  if (this->d_weight != 0L) delete this->d_weight;
 
-  if (this->d_corrfct != NULL) delete this->d_corrfct;
-  if (this->d_corrfft1 != NULL) delete this->d_corrfft1;
-  if (this->d_corrfft2 != NULL) delete this->d_corrfft2;
-  if (this->d_corrnorm != NULL) delete this->d_corrnorm;
-  if (this->d_corr != NULL) delete this->d_corr;
+  if (this->d_corrfct != 0L) delete this->d_corrfct;
+  if (this->d_corrfft1 != 0L) delete this->d_corrfft1;
+  if (this->d_corrfft2 != 0L) delete this->d_corrfft2;
+  if (this->d_corrnorm != 0L) delete this->d_corrnorm;
+  if (this->d_corr != 0L) delete this->d_corr;
 
 }
 
@@ -178,24 +178,24 @@ int yoga_wfs::load_corrfct(float *corrfct, int device)
   long *dims_data3 = new long[4];
   dims_data3[0] = 3;
   dims_data3[1] = npix; dims_data3[2] = npix; dims_data3[3] = nvalid;  
-  if (this->d_corrfct  == NULL) this->d_corrfct = new yoga_obj<float>(dims_data3);
+  if (this->d_corrfct  == 0L) this->d_corrfct = new yoga_obj<float>(dims_data3);
 
   dims_data3[1] = 2*npix; dims_data3[2] = 2*npix; 
   int mdims[2];
   mdims[0] = (int)dims_data3[1];
   mdims[1] = (int)dims_data3[2];
 
-  if (this->d_corrfft1 == NULL) {
+  if (this->d_corrfft1 == 0L) {
     this->d_corrfft1 = new yoga_obj<cuFloatComplex>(dims_data3);
     cufftSafeCall(cufftPlanMany(&(this->d_corrfft1->plan), 2 ,mdims,NULL,1,0,NULL,1,0,CUFFT_C2C ,(int)dims_data3[3]));
     this->d_corrfft1->fft_on = true;
   }
 
-  if (this->d_corrfft2 == NULL) this->d_corrfft2 = new yoga_obj<cuFloatComplex>(dims_data3);
+  if (this->d_corrfft2 == 0L) this->d_corrfft2 = new yoga_obj<cuFloatComplex>(dims_data3);
 
   dims_data3[1] = 2*npix-1; dims_data3[2] = 2*npix-1;
-  if (this->d_corrnorm  == NULL) this->d_corrnorm = new yoga_obj<float>(dims_data3);
-  if (this->d_corr  == NULL) this->d_corr = new yoga_obj<float>(dims_data3);
+  if (this->d_corrnorm  == 0L) this->d_corrnorm = new yoga_obj<float>(dims_data3);
+  if (this->d_corr  == 0L) this->d_corr = new yoga_obj<float>(dims_data3);
 
   this->d_corrfct->host2device(corrfct);
 
@@ -221,8 +221,8 @@ int yoga_wfs::load_corrfct(float *corrfct, int device)
 
 int yoga_wfs::init_nmax(int nmax)
 {
-  if (this->d_validpix != NULL) delete this->d_validpix;
-  if (this->d_validindx!= NULL)  delete  this->d_validindx;
+  if (this->d_validpix != 0L) delete this->d_validpix;
+  if (this->d_validindx!= 0L)  delete  this->d_validindx;
 
   long *dims_data2 = new long[3];
   dims_data2[0] = 2; 

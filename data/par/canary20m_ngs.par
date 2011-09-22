@@ -7,19 +7,19 @@ y_geom.zenithangle = 0.;
 telescope inits
 */
 
-y_tel.diam = 8.f;
-y_tel.cobs = 0.12f;
+y_tel.diam = 20.0f;
+y_tel.cobs = 0.286f;
 
 /*
 atmosphere inits
 */
 
 y_atmos.r0           = 0.16;
-y_atmos.nscreens     = 1;
-y_atmos.frac         = &([1.0]);
-y_atmos.alt          = &([0.0]);
-y_atmos.windspeed    = &([20.]);
-y_atmos.winddir      = &([0]);
+y_atmos.nscreens     = 4;
+y_atmos.frac         = &([0.45,0.15,0.3,0.1]);
+y_atmos.alt          = &([0.,2500,4000,13500]);
+y_atmos.windspeed    = &([7.5,12.5,15,20]);
+y_atmos.winddir      = &([0,0,0,0]);
 
 /*
 target inits
@@ -41,18 +41,28 @@ y_loop.ittime = 1/500.0f;
 /*
 loop inits
 */
-y_wfs                  = array(wfs_struct(),1); // clean start
-y_wfs(1).nxsub         = 16;
-y_wfs(1).npix          = 7;
-y_wfs(1).pixsize       = 0.5;
-y_wfs(1).fracsub       = 0.8;
+nwfs = 4;
+y_wfs          = array(wfs_struct(),nwfs); // clean start
+
+for (i=1;i<=nwfs;i++){
+y_wfs(i).nxsub         = 40;
+y_wfs(i).npix          = 16;
+y_wfs(i).pixsize       = 0.3;
+y_wfs(i).fracsub       = 0.8;
+y_wfs(i).lambda        = 0.5;
+y_wfs(i).gsmag         = 5.;
+y_wfs(i).optthroughput = 0.5;
+y_wfs(i).zerop         = 1.e11;
+y_wfs(i).noise         = -1;
+}
 y_wfs(1).xpos          = 0.0;
 y_wfs(1).ypos          = 0.0;
-y_wfs(1).lambda        = 0.5;
-y_wfs(1).gsmag         = 5.;
-y_wfs(1).optthroughput = 0.5;
-y_wfs(1).zerop         = 1.e11;
-y_wfs(1).noise         = -1;
+
+for (i=1;i<=nwfs-1;i++) {
+y_wfs(i).xpos          = 40.*cos(2*pi/3*i);
+y_wfs(i).ypos          = 40.*sin(2*pi/3*i);
+}
+
 
 /*
 //lgs mode

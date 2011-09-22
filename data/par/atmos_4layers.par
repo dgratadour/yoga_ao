@@ -25,11 +25,11 @@ y_atmos.winddir      = &([0,0,0,0]);
 target inits
 */
 
-y_target.ntargets = 2;
-y_target.xpos     = &([0.0f,40.0f]);
-y_target.ypos     = &([0.0f,-40.0f]);
-y_target.lambda   = &([1.65,1.65]);
-y_target.mag      = &([10.,12.]);
+y_target.ntargets = 5;
+y_target.xpos     = &([0.0f,0.0f,40.0f,0.0f,-40.0f]);
+y_target.ypos     = &([0.0f,40.0f,0.0f,-40.0f,0.0f]);
+y_target.lambda   = &([1.65,1.65,1.65,1.65,1.65]);
+y_target.mag      = &([10.,12.,8.,9.,11.]);
 
 /*
 loop inits
