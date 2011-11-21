@@ -30,8 +30,4 @@ class yoga_phase {
 
 };
 
-template<class T> int launch_tcopy(T *d_odata,T *d_idata,int nx, int ny);
-
-int phase_copy(yoga_phase *phase1,yoga_phase *phase2); 
-
 #endif // _YOGA_PHASE_H_

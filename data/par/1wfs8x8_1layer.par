@@ -19,7 +19,7 @@ y_atmos.nscreens     = 1;
 y_atmos.frac         = &([1.0]);
 y_atmos.alt          = &([0.0]);
 y_atmos.windspeed    = &([20.]);
-y_atmos.winddir      = &([0]);
+y_atmos.winddir      = &([45]);
 
 /*
 target inits
@@ -39,12 +39,12 @@ y_loop.niter  = 1000;
 y_loop.ittime = 1/500.0f;
 
 /*
-loop inits
+wfs inits
 */
 y_wfs                  = array(wfs_struct(),1); // clean start
-y_wfs(1).nxsub         = 8;
-y_wfs(1).npix          = 7;
-y_wfs(1).pixsize       = 0.5;
+y_wfs(1).nxsub         = 7;
+y_wfs(1).npix          = 16;
+y_wfs(1).pixsize       = 0.3;
 y_wfs(1).fracsub       = 0.8;
 y_wfs(1).xpos          = 0.0;
 y_wfs(1).ypos          = 0.0;

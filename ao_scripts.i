@@ -22,7 +22,14 @@ func script_atmos_full(void)
 
   tabres = array(0.0f,4,4);
 
-  filenames = [["atmos_1layer.par","atmos_1layer_vlt.par","atmos_1layer_20m.par","atmos_1layer_elt.par"],["atmos_1layer_5targets.par","atmos_1layer_vlt_5targets.par","atmos_1layer_20m_5targets.par","atmos_1layer_elt_5targets.par"],["atmos_4layers.par","atmos_4layers_vlt.par","atmos_4layers_20m.par","atmos_4layers_elt.par"],["atmos_12layers.par","atmos_12layers_vlt.par","atmos_12layers_20m.par","atmos_12layers_elt.par"]];
+  filenames = [["atmos_1layer.par","atmos_1layer_vlt.par","atmos_1layer_20m.par",
+                "atmos_1layer_elt.par"],
+               ["atmos_1layer_5targets.par","atmos_1layer_vlt_5targets.par",
+                "atmos_1layer_20m_5targets.par","atmos_1layer_elt_5targets.par"],
+               ["atmos_4layers.par","atmos_4layers_vlt.par","atmos_4layers_20m.par",
+                "atmos_4layers_elt.par"],
+               ["atmos_12layers.par","atmos_12layers_vlt.par","atmos_12layers_20m.par",
+                "atmos_12layers_elt.par"]];
                  
   for (i=1;i<=4;i++) {
     for (j=1;j<=4;j++) {
@@ -322,6 +329,7 @@ func script_wfs(filename,typeslp,verbose=)
   extern y_geom,y_tel,y_loop,y_atmos,y_wfs;
   extern g_atmos,g_target,g_wfs;
   extern ipupil;
+  extern cb_slopes1,cb_slopes2;
 
   if (verbose == []) verbose = 1;
   
@@ -350,6 +358,17 @@ func script_wfs(filename,typeslp,verbose=)
 
   if (verbose) write,format="Starting loop on : %d iterations\n",y_loop.niter;
   
+  move_sky,g_atmos,g_target;
+  sensors_trace,g_wfs,0,g_atmos;
+  sensors_compimg,g_wfs,0;
+  /*
+  error;
+  tmp1 = sensors_getdata(g_wfs,0,"amplipu");
+  tmp2 = sensors_getdata(g_wfs,0,"amplifoc");
+  */
+  tmp = sensors_getslopes(g_wfs,0);
+  cb_slopes1 =  cb_slopes2 = array(0.0,numberof(tmp),y_loop.niter);
+  
   mytime = tic();
   for (cc=1;cc<=y_loop.niter;cc++) {
     //tinter = tic();
@@ -364,7 +383,12 @@ func script_wfs(filename,typeslp,verbose=)
           if (typeslp == 3) sensors_compslopes,g_wfs,i-1;
           if (typeslp == 4) sensors_compslopes,g_wfs,i-1,1,10;
           if (typeslp == 5) sensors_compslopes,g_wfs,i-1,2,100.;
+          tmp = sensors_getslopes(g_wfs,0);
+         cb_slopes1(,cc)=tmp;
+         slopes_geom,g_wfs,i-1,0;
         }
+        tmp = sensors_getslopes(g_wfs,0);
+        cb_slopes2(,cc)=tmp;         
       }
     }
     if (verbose) { 
@@ -376,12 +400,186 @@ func script_wfs(filename,typeslp,verbose=)
   }
 
   if (verbose) {
-    write,"... Done !";
-    write,format="Average wfs gpu time : %.4f s\n",tac(mytime)/y_loop.niter;
+    write,"... done !";
+    write,format="average wfs gpu time : %.4f s\n",tac(mytime)/y_loop.niter;
   }
+  cent_err =
+    minmax(((cb_slopes1-(y_wfs(1).npix/2.+0.5))*y_wfs(1).pixsize-cb_slopes2)(,avg));
+  
+  write,format="min / max centroiding error (arcsec) %.4f / %.4f\n",cent_err(1),cent_err(2);
 
+  reduce_script,1;
+  
   return tac(mytime)/y_loop.niter;
 }
+
+func reduce_script(nwfs,disp=)
+{
+  Dssp = y_tel.diam/y_wfs(nwfs).nxsub;
+  
+  //in arcsec
+  mesSlopes  = (cb_slopes1-(y_wfs(nwfs).npix/2.+0.5))*y_wfs(nwfs).pixsize;
+  trueSlopes = cb_slopes2;
+  
+  // Centroid gain : linear regression of measured data versus real ones
+  tab_regressX = tab_regressY = array(0.,y_wfs(nwfs)._nvalid);
+  for(j=1;j<=y_wfs(nwfs)._nvalid;j++) {
+    tab_regressX(j) = regressAx(mesSlopes(j,), trueSlopes(j,)) + 1e-20;
+    tab_regressY(j) = regressAx(mesSlopes(j+y_wfs(nwfs)._nvalid,), trueSlopes(j+y_wfs(nwfs)._nvalid,)) + 1e-20;
+  }
+  // Centroid error : this assumes centroid gain=1
+  Dg = mesSlopes - trueSlopes;
+  
+  // computation of uncorrelated noise : the true noise (as seen by a closed loop).
+  uDg = mesSlopes/_(tab_regressX,tab_regressY)(,-:1:y_loop.niter) - trueSlopes;
+  // variance non centree, en arcsec
+  noise_level_asec = (uDg^2)(,avg);                               
+  // variance traduite en phase (rd^2)
+  noiseLevel      = noise_level_asec * (2.*pi*Dssp/(y_wfs(1).lambda *1.e-6))^2 / (RASC*RASC);
+  noiseLevelNmRms = sqrt(noiseLevel) * (y_wfs(nwfs).lambda*1e3/2/pi);
+
+  "Slopes noise level (nm rms):";
+  noiseLevelNmRms;
+
+  if (disp) {
+    window,0;fma;
+    tmp=wfs_map(noiseLevelNmRms(1:y_wfs(nwfs)._nvalid),y_wfs(nwfs),type="subaps");
+    pli,tmp;
+    colorbar,min(tmp),max(tmp);
+    pltitle,"x slopes noise level (nm rms)";
+    
+    window,1;fma;
+    tmp=wfs_map(noiseLevelNmRms(y_wfs(nwfs)._nvalid+1:),y_wfs(nwfs),type="subaps");
+    pli,tmp;
+    colorbar,min(tmp),max(tmp);
+    pltitle,"y slopes noise level (nm rms)";
+    
+    window,2;fma;
+    tmp=wfs_map(tab_regressX,y_wfs(nwfs),type="subaps");
+    pli,tmp;
+    colorbar,min(tmp),max(tmp);
+    pltitle,"x slopes gain";
+    
+    window,3;fma;
+    tmp=wfs_map(tab_regressY,y_wfs(nwfs),type="subaps");
+    pli,tmp;
+    colorbar,min(tmp),max(tmp);
+    pltitle,"y slopes gain";
+  }
+}
+
+func scatter_slopes(nwfs,nsub)
+{
+  mesSlopes  = (cb_slopes1-(y_wfs(nwfs).npix/2.+0.5))*y_wfs(nwfs).pixsize;
+  trueSlopes = cb_slopes2;
+  
+  // Centroid gain : linear regression of measured data versus real ones
+  tab_regressX = tab_regressY = array(0.,y_wfs(nwfs)._nvalid);
+  for(j=1;j<=y_wfs(nwfs)._nvalid;j++) {
+    tab_regressX(j) = regressAx(mesSlopes(j,), trueSlopes(j,)) + 1e-20;
+    tab_regressY(j) = regressAx(mesSlopes(j+y_wfs(nwfs)._nvalid,), trueSlopes(j+y_wfs(nwfs)._nvalid,)) + 1e-20;
+  }
+  
+  window,0; fma;limits;
+  plmk, mesSlopes(nsub,), trueSlopes(nsub,), color="red",msize=0.1;
+  plmk, mesSlopes(nsub+y_wfs(nwfs)._nvalid,), trueSlopes(nsub+y_wfs(nwfs)._nvalid,), msize=0.1, color="green";
+  xytitles,"True","Measured";
+  a=limits();
+  lim = minmax(a(1:4));
+  plg,[lim(1),lim(2)],[lim(1),lim(2)],color="black",marks=0;
+  //plg,[min(GG),max(GG)]*tab_regress(Jdisp),[min(GG),max(GG)],color="red",marks=0;
+  plt,"y=x",0.22,0.83,tosys=0;
+
+
+}
+
+
+func script_slopes_canary(alt,typeslp,niter,verbose=)
+// alt in meters
+{
+  extern y_geom,y_tel,y_loop,y_atmos,y_wfs;
+  extern g_atmos,g_target,g_wfs;
+  extern ipupil;
+  extern cb_slopes1,cb_slopes2;
+
+  if (verbose == []) verbose = 1;
+  
+  filename = YOGA_AO_PARPATH+"canary_ngs.par";
+  //if (filename == []) filename = YOGA_AO_PARPATH+"atmos_12layers.par";
+
+  if ((!(fileExist(filename))) && (!(fileExist(YOGA_AO_PARPATH+filename))))
+    error,"could not find"+filename;
+  
+  if (!(fileExist(filename)))
+    filename = YOGA_AO_PARPATH+filename;
+
+  read_parfile,filename;
+  y_atmos.alt = &([alt]);
+  if (niter != []) y_loop.niter = niter;
+
+  if (typeslp == []) typeslp=0;
+  
+  if (y_loop.niter == []) y_loop.niter = 1000;
+
+  wfs_init;
+
+  atmos_init;
+ 
+  target_init;
+
+  if (verbose) write,"... Done with inits !";
+
+  if (verbose) write,format="Starting loop on : %d iterations\n",y_loop.niter;
+  
+  tmp = [];
+  for (i=1;i<=numberof(y_wfs);i++) {
+    grow,tmp,sensors_getslopes(g_wfs,i-1);
+  }
+  
+  cb_slopes = array(0.0,numberof(tmp),y_loop.niter);
+  
+  mytime = tic();
+  for (cc=1;cc<=y_loop.niter;cc++) {
+    //tinter = tic();
+    move_sky,g_atmos,g_target;
+    if ((y_wfs != []) && (g_wfs != [])) {
+      tmp = [];
+      for (i=1;i<=numberof(y_wfs);i++) {
+        sensors_trace,g_wfs,i-1,g_atmos;
+        if (typeslp > 2) {
+          // centroiding method : need to compute sh images
+          sensors_compimg,g_wfs,i-1; // computing image for sensor i
+          if (typeslp == 3) sensors_compslopes,g_wfs,i-1;
+          if (typeslp == 4) sensors_compslopes,g_wfs,i-1,1,10;
+          if (typeslp == 5) sensors_compslopes,g_wfs,i-1,2,100.;
+        } else {
+          // geometric slopes
+          if (typeslp == 1) slopes_geom,g_wfs,i-1,0; // approx square pupil
+          if (typeslp == 2) slopes_geom,g_wfs,i-1,1; // real pupil
+        }
+        if (typeslp > 0) grow,tmp,sensors_getslopes(g_wfs,i-1);
+      }
+      cb_slopes(,cc)=tmp;         
+    }
+    if (verbose) { 
+      if (cc % 10 == 0) {
+        time_move = tac(mytime)/cc;
+        write,format="\r Estimated remaining time : %.2f s",(y_loop.niter - cc)*time_move;
+      }
+    }
+  }
+
+  if (verbose) {
+    write,"... done !";
+    write,format="average wfs gpu time : %.4f s\n",tac(mytime)/y_loop.niter;
+  }
+
+  //reduce_script,1;
+  
+  return cb_slopes;
+}
+
+
 
 /*
 // results
@@ -432,6 +630,7 @@ canary6 = [0.0022514 , 0.0059298 , 0.0297773, 0.113609]
 
 func check_centroiding(void)
 {
+  RASC = 180*3600/pi;
   // check geom slopes
   slopes_geom,g_wfs,0,0;
   slp=sensors_getslopes(g_wfs,0);
@@ -440,7 +639,10 @@ func check_centroiding(void)
   slpy = res(avg,0,)-res(avg,1,);
   geom=_(slpx,slpy);
   geom/slp;
-
+  // in arcsec :
+  lam_over_D = RASC * y_wfs(1).lambda *1.e-6/ (y_tel.diam/y_wfs(1).nxsub);
+  geom *= (lam_over_D/2/pi);
+  
   slopes_geom,g_wfs,0,0;
   slp=sensors_getslopes(g_wfs,0);
   slopes_geom,g_wfs,0,1;

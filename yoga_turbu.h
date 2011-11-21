@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <map>
+#include <yoga_ao_utils.h>
 #include <yoga_phase.h>
 
 using namespace std;
@@ -10,6 +11,7 @@ using namespace std;
 class yoga_tscreen {
  public:
 
+  int                    device;       // The device # 
   yoga_phase             *d_tscreen;   // The phase screen   
   yoga_obj<float>        *d_tscreen_o; // Additional space of the same size as the phase screen
   yoga_obj<float>        *d_A;         // A matrix for extrusion
@@ -29,9 +31,10 @@ class yoga_tscreen {
   //internal
   float                  accumx;
   float                  accumy;
+  cudaChannelFormatDesc  channelDesc;  // Channel descriptor for texture memory access
 
  public:
-  yoga_tscreen(long size, long size2, float amplitude, float altitude, float windspeed, float winddir, float deltax, float deltay);
+  yoga_tscreen(long size, long size2, float amplitude, float altitude, float windspeed, float winddir, float deltax, float deltay,int device);
   yoga_tscreen(const yoga_tscreen& tscreen);
   ~yoga_tscreen();
 
@@ -48,7 +51,7 @@ class yoga_atmos {
   yoga_obj<float>        *d_pupil;     
      
  public:
-  yoga_atmos(int nscreens,float *r0,long *size, long *size2, float *altitude, float *windspeed, float *winddir, float *deltax, float *deltay, float *pupil);
+  yoga_atmos(int nscreens,float *r0,long *size, long *size2, float *altitude, float *windspeed, float *winddir, float *deltax, float *deltay, float *pupil, int device);
   ~yoga_atmos();
 
   int init_screen(float alt,float *h_A, float *h_B, unsigned int *h_istencilx,unsigned int *h_istencily, int seed);

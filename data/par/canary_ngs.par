@@ -14,12 +14,21 @@ y_tel.cobs = 0.286f;
 atmosphere inits
 */
 
+/*
 y_atmos.r0           = 0.16;
 y_atmos.nscreens     = 4;
 y_atmos.frac         = &([0.45,0.15,0.3,0.1]);
 y_atmos.alt          = &([0.,2500,4000,13500]);
 y_atmos.windspeed    = &([7.5,12.5,15,20]);
 y_atmos.winddir      = &([0,0,0,0]);
+*/
+y_atmos.r0           = 0.16;
+y_atmos.nscreens     = 1;
+y_atmos.frac         = &([1.]);
+y_atmos.alt          = &([0.]);
+y_atmos.windspeed    = &([5.]);
+y_atmos.winddir      = &([0]);
+
 
 /*
 target inits
@@ -35,8 +44,8 @@ y_target.mag      = &([10.]);
 loop inits
 */
 
-y_loop.niter  = 1000;
-y_loop.ittime = 1/500.0f;
+y_loop.niter  = 20000;
+y_loop.ittime = 1/150.0f;
 
 /*
 loop inits
@@ -47,7 +56,7 @@ y_wfs          = array(wfs_struct(),nwfs); // clean start
 for (i=1;i<=nwfs;i++){
 y_wfs(i).nxsub         = 7;
 y_wfs(i).npix          = 16;
-y_wfs(i).pixsize       = 0.3;
+y_wfs(i).pixsize       = 0.25;
 y_wfs(i).fracsub       = 0.8;
 y_wfs(i).lambda        = 0.5;
 y_wfs(i).gsmag         = 5.;

@@ -23,7 +23,7 @@ func init_wfs_size(wfs,&pdiam,&Nfft,&Ntot,&nrebin,&pixsize,&qpixsize)
 {
   /*
     Scheme to determine arrays sizes ...
-    k = 5
+    k = 6
     p = k * d/r0
     n = long(2*d*v/lambda/RASC)+1
     N = fft_goodsize(k*n/v*lambda/r0*RASC)
@@ -78,6 +78,8 @@ func init_wfs_size(wfs,&pdiam,&Nfft,&Ntot,&nrebin,&pixsize,&qpixsize)
     Ntot = long(pixsize * wfs.npix / qpixsize) + 1;
   else Ntot = Nfft;
 
+  if (Ntot%2 != Nfft%2) Ntot+=1;
+  
   write,format="quantum pixsize : %.4f \"\n",qpixsize;
   write,format="simulated FoV : %.2f\" x %.2f\"\n",Ntot * qpixsize,Ntot * qpixsize;
   write,format="actual pixsize : %.2f\"\n",pixsize;
@@ -165,15 +167,12 @@ func init_wfs_geom(n,pupil)
   y_wfs(n)._phasemap = &int(phasemap(*,));
 
   //this is a phase shift of 1/2 pix in x and y
-  halfxy = (1i * span(0,2*pi,y_wfs(n)._Nfft+1)(1:y_wfs(n)._pdiam) / 2.)(,-:1:y_wfs(n)._pdiam);
+  halfxy = (span(0,2*pi,y_wfs(n)._Nfft+1)(1:y_wfs(n)._pdiam) / 2.)(,-:1:y_wfs(n)._pdiam);
   halfxy += transpose(halfxy);
 
   //this defines how we create a larger fov if required
   if (y_wfs(n)._Ntot != y_wfs(n)._Nfft) {
-    if (y_wfs(n)._Nfft % 2 != y_wfs(n)._Ntot % 2) 
-      x1=long((y_wfs(n)._Ntot-y_wfs(n)._Nfft)/2.)+2;
-    else
-      x1=long((y_wfs(n)._Ntot-y_wfs(n)._Nfft)/2.)+1;
+    x1=long((y_wfs(n)._Ntot-y_wfs(n)._Nfft)/2.)+1;
     x2=long(x1+y_wfs(n)._Nfft-1);
 
     tmp   = indices(y_wfs(n)._Nfft);
@@ -183,7 +182,7 @@ func init_wfs_geom(n,pupil)
     
     y_wfs(n)._hrmap = &int(hrmap-1);
   } else y_wfs(n)._hrmap = &int(0);
-  
+
   //creating the binindices array
   // note: if Ntot and nrebin*npix does not have the same parity
   // then it is impossible to rebin correctly while keeping
@@ -195,14 +194,26 @@ func init_wfs_geom(n,pupil)
   
   if (y_wfs(n)._nrebin*y_wfs(n).npix % 2 != y_wfs(n)._Ntot % 2) 
     x1=long((y_wfs(n)._Ntot-y_wfs(n)._nrebin*y_wfs(n).npix)/2.)+2;
-  else
-    x1=long((y_wfs(n)._Ntot-y_wfs(n)._nrebin*y_wfs(n).npix)/2.)+1;
+  else x1=long((y_wfs(n)._Ntot-y_wfs(n)._nrebin*y_wfs(n).npix)/2.)+1;
   x2=long(x1+y_wfs(n)._nrebin*y_wfs(n).npix-1);
-  
-  if (y_wfs(n)._nrebin*y_wfs(n).npix % 2 != y_wfs(n)._Ntot % 2) 
-    y_wfs(n)._halfxy = &float(halfxy.im);
-  else y_wfs(n)._halfxy = &float(halfxy.im*0.);
-  
+
+  //  if (y_wfs(n).gsalt == 0.) {
+    if ((y_wfs(n).npix % 2 < y_wfs(n)._Nfft % 2) ||
+        (y_wfs(n).npix % 2 != y_wfs(n)._pdiam % 2)) 
+      y_wfs(n)._halfxy = &float(halfxy);
+    else y_wfs(n)._halfxy = &float(halfxy*0.);
+    
+    if (y_wfs(n).gsalt != 0.) {
+      if ((y_wfs(n).npix*y_wfs(n)._nrebin) % 2 != y_wfs(n)._Nfft % 2)
+        y_wfs(n)._halfxy = &float(*y_wfs(n)._halfxy-2.*halfxy);
+      if (y_wfs(n)._Nfft % 2 == 0)
+        y_wfs(n)._halfxy = &float(*y_wfs(n)._halfxy+halfxy);
+    }
+    //  } else {
+    //if (y_wfs(n).npix % 2 < y_wfs(n)._pdiam % 2) y_wfs(n)._halfxy = &float(halfxy);
+    //else y_wfs(n)._halfxy = &float(halfxy*0.);
+    //}
+
   binindices = array(0,y_wfs(n)._Ntot,y_wfs(n)._Ntot);
   tmp = long((indices(y_wfs(n)._nrebin*y_wfs(n).npix) -1) / y_wfs(n)._nrebin);
   binindices(x1:x2,x1:x2) = tmp(,,1)+tmp(,,2)*y_wfs(n).npix+1;
@@ -221,17 +232,6 @@ func init_wfs_geom(n,pupil)
   fim = array(0.0f,y_wfs(n).npix,y_wfs(n).npix);
   for(i=1;i<=y_wfs(n).npix*y_wfs(n).npix;i++) fim(*)(i) = res(,,7)(*)(binmap(,i)+1)(sum);
   */
-  
-  //mapping the subaps binned images on the total image
-  imamap =  array(0,y_wfs(n).npix*y_wfs(n).nxsub,y_wfs(n).npix*y_wfs(n).nxsub); 
-  tmp = (indices(y_wfs(n).npix) -1);
-  tmp = tmp(,,1)+tmp(,,2)*y_wfs(n).npix;
-  for (i=1;i<=y_wfs(n)._nvalid;i++) {
-    indi = ((*y_wfs(n)._validsubs)(1,i)-1)*(y_wfs(n).npix)+1;
-    indj = ((*y_wfs(n)._validsubs)(2,i)-1)*(y_wfs(n).npix)+1;
-    imamap(indi:indi+y_wfs(n).npix-1,indj:indj+y_wfs(n).npix-1) = tmp + (i-1) * (y_wfs(n).npix)^2 + 1;
-  }
-  y_wfs(n)._imamap = &int(where(imamap)(sort(imamap(where(imamap))))-1);
   
   // dealing with photometry
   telSurf  = pi/4.*y_tel.diam^2.;
@@ -267,6 +267,7 @@ func make_lgs(proftype)
 
 }
 
+
 func prep_lgs_prof(numwfs,prof,h,beam,center=)
 /* DOCUMENT prep_lgs_prof
    prep_lgs_prof,numwfs,prof,h,beam,center=
@@ -274,14 +275,9 @@ func prep_lgs_prof(numwfs,prof,h,beam,center=)
    The function returns an image array(double,n,n) of a laser beacon elongated by perpective
    effect. It is obtaind by convolution of a gaussian of width "lgsWidth" arcseconds, with the
    line of the sodium profile "prof". The altitude of the profile is the array "h".
-   n        : image size
-   z        : pixel size of the image (arcsec)
-   lgsWidth : width of gaussian, in arcsec
    prof     : Na profile intensity, in arbitrary units
    h        : altitude, in meters. h MUST be an array with EQUALLY spaced elements.
-   dOffAxis : offaxis distance of the subaperture that sees the beacon
-   H        : altitude at which the beacon is supposed to be (in meters)
-   azimut   : rotation of the beacon
+   beam     : size in arcsec of the laser beam
    center   : string, either "image" or "fourier" depending on where the centre should be.
    
    Computation of LGS spot from the sodium profile:
@@ -296,12 +292,21 @@ func prep_lgs_prof(numwfs,prof,h,beam,center=)
    which shows that the profile can be computed by
    - convolving the 1-D profile
    - multiplying it in the 2nd dimension by a gaussian function
+   
+   If one has to undersample the inital profile, then some structures may be "lost". In this case,
+     it's better to try to "save" those structures by re-sampling the integral of the profile, and
+     then derivating it afterwards.
+     Now, if the initial profile is a coarse one, and that one has to oversample it, then a
+     simple re-sampling of the profile is adequate.
      
    SEE ALSO:
  */
 {
   extern y_wfs;
   
+  y_wfs(numwfs)._prof1d  = &float(prof);
+  y_wfs(numwfs)._profcum = &float(prof(cum));
+
   subapdiam = y_tel.diam / double(y_wfs(numwfs).nxsub); // diam of subap
   if (y_wfs(numwfs).nxsub > 1)
     xsubs = span(-y_tel.diam/2+subapdiam/2,y_tel.diam/2-subapdiam/2,y_wfs(numwfs).nxsub);
@@ -310,11 +315,11 @@ func prep_lgs_prof(numwfs,prof,h,beam,center=)
   
   np = dimsof(prof)(2);       // number of points of the profile
   hG = sum(h*prof)/sum(prof); // center of gravity of the profile
-  x=(indgen(y_wfs(numwfs)._Ntot)-(y_wfs(numwfs)._Ntot/2+1));
+  x=(indgen(y_wfs(numwfs)._Ntot)-(y_wfs(numwfs)._Ntot/2.+0.5));
   // x expressed in pixels. (0,0) is in the fourier-center.
   x = x*y_wfs(numwfs)._qpixsize;  // x expressed in arcseconds
   dx = x(2)-x(1);
-
+  dh = h(2)-h(1);
   
   if (y_wfs(numwfs).nxsub > 1)
     dOffAxis = sqrt((xsubs((*y_wfs(numwfs)._validsubs)(1,))-y_wfs(numwfs).lltx)^2 +
@@ -322,35 +327,7 @@ func prep_lgs_prof(numwfs,prof,h,beam,center=)
   else 
     dOffAxis = sqrt((xsubs-y_wfs(numwfs).lltx)^2 +
                     (ysubs-y_wfs(numwfs).llty)^2);
-  
-  subsdone = array(1,y_wfs(numwfs)._nvalid);
-  
-  profi = array(0.0f,y_wfs(numwfs)._Ntot,y_wfs(numwfs)._nvalid);
 
-  while (subsdone(*)(sum) > 0) {
-    tmp = dOffAxis(where(subsdone)(1));
-    inds = where(dOffAxis == tmp);
-    // height, translated in arcsec due to perspective effect
-    zhc = (h-hG)*(206265.*tmp/double(hG)^2.); 
-    dzhc = zhc(2)-zhc(1);
-    
-    if (y_wfs(numwfs)._qpixsize > dzhc) {
-      x_tmp = x(pcen);
-      zhc_tmp = zhc(pcen);
-      prof_tmp = prof(cum);
-      profi(,inds) = interp(prof_tmp,zhc_tmp,x_tmp)(dif)*dzhc/dx;
-    } else {
-      x_tmp = x;
-      zhc_tmp = zhc;
-      prof_tmp = prof;
-      profi(,inds) = interp(prof_tmp,zhc_tmp,x_tmp)*dzhc/dx;
-    }
-    subsdone(inds) = 0;
-  }  
-  
-  /*
-    place for manual interp
-   */
   w = beam / 2.35482005;      //  sigma.   (2*sqrt(2*log(2)))=2.35482005
   if( w==0 ) {
     g = array(0.0,n);
@@ -361,32 +338,24 @@ func prep_lgs_prof(numwfs,prof,h,beam,center=)
   }
   else {
     if( center=="image" )
-      g = exp( -((x+z/2)^2/(2*w^2.) ) );
+      g = exp( -((x+y_wfs(numwfs)._qpixsize/2)^2/(2*w^2.) ) );
     else
       g = exp( -(x^2/(2*w^2.) ) );
-    //=mygauss2(24,13,13,wx*2*sqrt(2*log(2)),wy*2*sqrt(2*log(2)),1.,0.,0.,,deriv=0);
   }
 
+  y_wfs(numwfs)._ftbeam  = &float(transpose([fft(g,1).re,fft(g,1).im]));
+  y_wfs(numwfs)._beam    = &float(g);
   // convolved profile in 1D.
-  p1d = roll(fft(fft(profi,[1,0]) * fft(g(,-:1:y_wfs(numwfs)._nvalid),[1,0]),[-1,0]).re,[y_wfs(numwfs)._Ntot/2,0]);
-  // abs is just to ensure only positive values (else values ~ -1e-12 may appear)
-  p1d = abs(p1d);
-  im = p1d(,-,) * g(-,,-:1:y_wfs(numwfs)._nvalid);
-  if (center == "image")
-    xcent = ycent = y_wfs(numwfs)._Ntot/2+0.5;
-  else
-    xcent = ycent = y_wfs(numwfs)._Ntot/2+1;
 
-  for (cc=1;cc<=y_wfs(numwfs)._nvalid;cc++) {
-    xsub = xsubs((*y_wfs(numwfs)._validsubs)(1,cc));
-    ysub = ysubs((*y_wfs(numwfs)._validsubs)(2,cc));
-    azimut = atan(ysub-y_wfs(numwfs).llty,xsub-y_wfs(numwfs).lltx);
-    azimut = azimut*180./pi;
-    im(,,cc) = fft_rotate(im(,,cc),-azimut);
-    im(,,cc) /= sum(im(,,cc));
-  }
+  azimut=atan(ysubs((*y_wfs(numwfs)._validsubs)(2,))-y_wfs(numwfs).llty,
+                    xsubs((*y_wfs(numwfs)._validsubs)(1,))-y_wfs(numwfs).lltx);
 
-  y_wfs(numwfs)._lgskern = &float(im);
+  y_wfs(numwfs)._azimuth  = &float(azimut);
+
+  sensors_initlgs,g_wfs,numwfs-1,numberof(*y_wfs(numwfs)._prof1d),hG,h(1),dh,y_wfs(numwfs)._qpixsize,
+    dOffAxis,float(*y_wfs(numwfs)._prof1d),float(*y_wfs(numwfs)._profcum),float(*y_wfs(numwfs)._beam),
+    float(*y_wfs(numwfs)._ftbeam),float(*y_wfs(numwfs)._azimuth);
+  
 } 
 
 
@@ -424,27 +393,108 @@ func wfs_map(arr,wfs,type=)
   }
 }
 
-/*  //manual interp
-  xprofbin = deltaprofbin = array(0,y_wfs(numwfs)._Ntot+1,y_wfs(numwfs)._nvalid);
-    for (i=1;i<=numberof(x_tmp);i++) {
-      if (x_tmp(i) > max(zhc_tmp)) xprofbin(i,cc) = numberof(zhc_tmp);
-      else {
-        tmp = where(zhc_tmp < x_tmp(i));
-        if (numberof(tmp) != 0) {
-          xprofbin(i,cc) = tmp(0);
-          deltaprofbin(i,cc) = x_tmp(i) - zhc_tmp(tmp(0));
-        } else xprofbin(i,cc) = 1;
-      }
-    }
-    
+func make_lgs_prof1d(numwfs,prof,h,beam,center=)
+/* DOCUMENT make_lgs_prof1d
+   make_lgs_prof1d,numwfs,prof,h,beam,center=
 
-    //interpolated :
-    if (y_wfs(numwfs)._qpixsize > dzhc) {
-      tmp = (prof_tmp(xprofbin(,cc)) + deltaprofbin(,cc)*(prof_tmp(clip(xprofbin(,cc)+1,,numberof(zhc_tmp)))-prof_tmp(xprofbin(,cc)))/dzhc);
-      profi(,cc) = tmp(dif)*dzhc/dx;
-    } else {
-      tmp = (prof_tmp(xprofbin(1:y_wfs(numwfs)._Ntot,cc)) + deltaprofbin(1:y_wfs(numwfs)._Ntot,cc)*(prof_tmp(clip(xprofbin(1:y_wfs(numwfs)._Ntot,cc)+1,,numberof(zhc_tmp)))-prof_tmp(xprofbin(1:y_wfs(numwfs)._Ntot,cc)))/dzhc);
-      profi(,cc) = tmp*dzhc/dx;
-    }
-
+   same as prep_lgs_prof but cpu only
+   
+   SEE ALSO:
  */
+{
+  extern y_wfs;
+  
+  y_wfs(numwfs)._prof1d  = &float(prof);
+  y_wfs(numwfs)._profcum = &float(prof(cum));
+
+  subapdiam = y_tel.diam / double(y_wfs(numwfs).nxsub); // diam of subap
+  if (y_wfs(numwfs).nxsub > 1)
+    xsubs = span(-y_tel.diam/2+subapdiam/2,y_tel.diam/2-subapdiam/2,y_wfs(numwfs).nxsub);
+  else xsubs = 0.;
+  ysubs = xsubs;
+  
+  np = dimsof(prof)(2);       // number of points of the profile
+  hG = sum(h*prof)/sum(prof); // center of gravity of the profile
+  x=(indgen(y_wfs(numwfs)._Ntot)-(y_wfs(numwfs)._Ntot/2.+0.5));
+  // x expressed in pixels. (0,0) is in the fourier-center.
+  x = x*y_wfs(numwfs)._qpixsize;  // x expressed in arcseconds
+  dx = x(2)-x(1);
+  dh = h(2)-h(1);
+  
+  if (y_wfs(numwfs).nxsub > 1)
+    dOffAxis = sqrt((xsubs((*y_wfs(numwfs)._validsubs)(1,))-y_wfs(numwfs).lltx)^2 +
+                    (ysubs((*y_wfs(numwfs)._validsubs)(2,))-y_wfs(numwfs).llty)^2);
+  else 
+    dOffAxis = sqrt((xsubs-y_wfs(numwfs).lltx)^2 +
+                    (ysubs-y_wfs(numwfs).llty)^2);
+
+  profi = array(0.0,y_wfs(numwfs)._Ntot,y_wfs(numwfs)._nvalid);
+  subsdone = array(1,y_wfs(numwfs)._nvalid);
+  dif2do  = array(0,y_wfs(numwfs)._nvalid);
+  
+  while (subsdone(*)(sum) > 0) {
+    tmp = dOffAxis(where(subsdone)(1));
+    inds = where(dOffAxis == tmp);
+    // height, translated in arcsec due to perspective effect
+    zhc = (h-hG)*(206265.*tmp/double(hG)^2.);
+
+    //x=(indgen(y_wfs(numwfs)._Ntot)-(y_wfs(numwfs)._Ntot/2.+0.5));
+    //x = x*y_wfs(numwfs)._qpixsize;  // x expressed in arcseconds
+    //xtmp = x / (206265./double(hG)^2.)/tmp + hG;
+    //xind = (xtmp-h(1))/deltah+1;
+
+    dzhc = zhc(2)-zhc(1);
+    if (y_wfs(numwfs)._qpixsize > dzhc) {
+      profi(,inds) = interp( prof(cum), zhc(pcen), x(pcen) )(dif);
+    } else {
+      profi(,inds) = interp( prof, zhc, x );
+    }
+    subsdone(inds) = 0;
+  }
+  
+  //profi /= profi(max,)(-,);
+ 
+  w = beam / 2.35482005;      //  sigma.   (2*sqrt(2*log(2)))=2.35482005
+  if( w==0 ) {
+    g = array(0.0,n);
+    if( center=="image" )
+      g(n/2:n/2+1)=0.5;
+    else
+      g(n/2+1)=1;
+  }
+  else {
+    if( center=="image" )
+      g = exp( -((x+y_wfs(numwfs)._qpixsize/2)^2/(2*w^2.) ) );
+    else
+      g = exp( -(x^2/(2*w^2.) ) );
+  }
+
+  y_wfs(numwfs)._ftbeam  = &float(transpose([fft(g,1).re,fft(g,1).im]));
+  y_wfs(numwfs)._beam    = &float(g);
+  // convolved profile in 1D.
+
+  p1d = roll(fft(fft(profi,[1,0]) * fft(g(,-:1:y_wfs(numwfs)._nvalid),[1,0]),[-1,0]).re,
+             [long(y_wfs(numwfs)._Ntot/2.+0.5),0]);
+  // abs is just to ensure only positive values (else values ~ -1e-12 may appear)
+  p1d = abs(p1d);
+  im = p1d(,-,) * g(-,,-:1:y_wfs(numwfs)._nvalid);
+
+  azimut=atan(ysubs((*y_wfs(numwfs)._validsubs)(2,))-y_wfs(numwfs).llty,
+                    xsubs((*y_wfs(numwfs)._validsubs)(1,))-y_wfs(numwfs).lltx);
+
+  y_wfs(numwfs)._azimuth  = &float(azimut);
+
+  if (center == "image")
+    xcent = ycent = y_wfs(numwfs)._Ntot/2+0.5;
+  else
+    xcent = ycent = y_wfs(numwfs)._Ntot/2+1;
+
+  im = rotate(im,azimut*180./pi,xcent,ycent);
+
+  //tmp = im(*,)(sum,);
+  //im /= tmp(-,-,);
+  
+  y_wfs(numwfs)._lgskern = &float(im);
+} 
+
+

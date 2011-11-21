@@ -121,7 +121,7 @@ extern yoga_target;
  */
 extern target_addlayer;
 /* DOCUMENT target_addlayer
-   target_addlayer,yoga_target_obj,ntarget,type,alt,xref,yref
+   target_addlayer,yoga_target_obj,ntarget,type,alt,xoff,yoff
    with type = "wfs" or "img"
      
    adds a layer of disturbances for a given target in an yTarget object
@@ -129,8 +129,8 @@ extern target_addlayer;
    ntarget         : index of the given target
    type            : type of layer "atmos" or "optics"
    alt             : altitude of layer
-   xref            : array of x positions of light rays in the pupil
-   yref            : array of y positions of light rays in the pupil
+   xoff            : array of x reference for raytracing
+   yoff            : array of y reference for raytracing
    
    SEE ALSO:
  */
@@ -167,7 +167,7 @@ extern target_getamplipup;
 
 // phase
 extern yoga_phase;
-extern phase_copy;
+//extern phase_copy;
 extern phase_set;
 
 // wfs
@@ -240,7 +240,7 @@ extern sensors_initgs;
  */
 extern sensors_addlayer;
 /* DOCUMENT sensors_addlayer
-   sensors_addlayer,yoga_sensors_obj,nsensor,type,alt,xref,yref
+   sensors_addlayer,yoga_sensors_obj,nsensor,type,alt,xoff,yoff
    type not used can be "atmos"
      
    add a disturbance layer for a given sensor in a ySensors object
@@ -248,14 +248,15 @@ extern sensors_addlayer;
    nsensor          : index of given wfs
    type             : type of layer "atmos" or "optics"
    alt              : altitude of layer
-   xref             : array of x positions of light rays in the pupil
-   yref             : array of y positions of light rays in the pupil
+   xoff            : array of x reference for raytracing
+   yoff            : array of y reference for raytracing
   
    SEE ALSO:
  */
 extern sensors_initarr;
 /* DOCUMENT sensors_initarr
-   sensors_initarr,yoga_sensors_obj,nsensor,phasemap,hrmap,imamap,binmap,offsets,pupil
+   sensors_initarr,yoga_sensors_obj,nsensor,phasemap,hrmap,binmap,offsets,pupil,fluxpersub,isvalid,
+   validsubsx,validsubsy,istart,jstart
      
    init arrays for image computation for a given sensor in a ySensors object
    yoga_sensors_obj : the ySensors object
@@ -264,12 +265,16 @@ extern sensors_initarr;
                       subaps phase screens
    hrmap            : array of pixels transform from minimal FoV image to
                       full FoV image (array of 0 if the same)
-   imamap           : array of pixels transform from subaps binned images to
-                      total wfs image
    binmap           : array of pixels transform from full FoV hr images to
                       binned images
    offsets          : array of pixels offsets for subaps phase screens
    pupil            : the pupil array
+   fluxpersub       : array of flux per subaperture
+   isvalid          : array nxsub x nxsub of 0/1 for valid subaps
+   validsubsx       : array nvalid x coordinates of valid subs in a nxsub x nxsub array
+   validsubsy       : array nvalid y coordinates of valid subs in a nxsub x nxsub array
+   istart           : i index of first phase elem of subap
+   istart           : j index of first phase elem of subap
    
    SEE ALSO:
  */
@@ -340,6 +345,7 @@ extern sensors_getdata;
 
    SEE ALSO:
  */
+
 extern sensors_loadkernels;
 /* DOCUMENT sensors_loadkernels
    sensors_loadkernels,yoga_sensors_obj,nsensor,kernels
@@ -348,6 +354,42 @@ extern sensors_loadkernels;
    yoga_sensors_obj : the ySensors object
    nsensor          : index of given wfs
    kernels          : array of lgs kernels for each subap
+
+   SEE ALSO:
+ */
+
+extern sensors_initlgs;
+/* DOCUMENT sensors_initlgs
+   sensors_initlgs,yoga_sensors_obj,nsensor,nprof,hg,h0,deltah,pixsize,doffaxis,prof1d,profcum,azimuth
+     
+   load all arrays needed for lgs spot computation for a given sensor in a ySensors object
+   yoga_sensors_obj : the ySensors object
+   nsensor          : index of given wfs
+   nprof            : # of elements in profile
+   hg               : altitude in m of profile cog
+   h0               : altitude in m of first element in profile
+   deltah           : profile resolution in m
+   pixsize          : high resolution image pixel size (in arcsec)
+   doffaxis         : array of off-axis distance
+   prof1d           : the sodium layer profile
+   profcum          : the sodium layer profile integrated
+   azimuth          : angles of rotation for each spot (rad)
+
+   SEE ALSO:
+ */
+
+extern sensors_updatelgs;
+/* DOCUMENT sensors_updatelgs
+   sensors_updatelgs,yoga_sensors_obj,nsensor,prof1d,profcum,ideriv,interpx,interpw
+     
+   update arrays for lgs spot computation for a given sensor in a ySensors object
+   yoga_sensors_obj : the ySensors object
+   nsensor          : index of given wfs
+   prof1d           : the sodium layer profile
+   profcum          : the sodium layer profile integrated
+   ideriv           : array of 0/1 for subaps for which profile has to be integrated before interp
+   interpx          : map of coordinates for profile interpolation
+   interpw          : map of weights for profile interpolation
 
    SEE ALSO:
  */

@@ -16,7 +16,8 @@ TGT=$(DEFAULT_TGT)
 PKG_NAME=yoga_ao
 PKG_I= yoga_aolib.i
 
-OBJS= yoga_phase.o yoga_turbu.o yoga_target.cuo yoga_target.o yoga_phase.cuo yoga_wfs.cuo yoga_wfs.o yoga_ao.o #yoga_turbu.cuo idx_test.o yoga_svd.o yoga_svd.cuo 
+OBJS= yoga_ao_utils.cuo yoga_phase.o yoga_turbu.o yoga_lgs.cuo yoga_lgs.o yoga_target.cuo yoga_target.o yoga_wfs.cuo yoga_wfs.o yoga_ao.o 
+#yoga_turbu.cuo 
 
 # change to give the executable a name other than yorick
 PKG_EXENAME=yorick

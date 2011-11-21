@@ -7,7 +7,7 @@
 int move_atmos(yoga_atmos *atmos,yoga_target *target) {
 
   map<float, yoga_tscreen *>::iterator p;
-  map<type_screen,yoga_obj<float> *>::iterator pp;
+  map<type_screen,float>::iterator pp;
   p = atmos->d_screens.begin();
   yoga_tscreen *tmp;
   int cpt=1;
@@ -22,18 +22,18 @@ int move_atmos(yoga_atmos *atmos,yoga_target *target) {
     for (int cc=0;cc<deltax;cc++) tmp->extrude(1);
     tmp->accumx -= deltax;
     for (int dd=0;dd<target->ntargets;dd++) {
-      pp = target->d_targets.at(dd)->rays_posx.find(make_pair("atmos",tmp->altitude));
-      if (pp != target->d_targets.at(dd)->rays_posx.end()) {
-	yoga_plus(pp->second->d_data,(tmp->deltax-deltax),pp->second->nb_elem);
+      pp = target->d_targets.at(dd)->xoff.find(make_pair("atmos",tmp->altitude));
+      if (pp != target->d_targets.at(dd)->xoff.end()) {
+	target->d_targets.at(dd)->xoff[make_pair("atmos",tmp->altitude)] += (tmp->deltax-deltax);
       }
     }
 
     for (int cc=0;cc<deltay;cc++) tmp->extrude(0);
     tmp->accumy -= deltay;
     for (int dd=0;dd<target->ntargets;dd++) {
-      pp = target->d_targets.at(dd)->rays_posy.find(make_pair("atmos",tmp->altitude));
-      if (pp != target->d_targets.at(dd)->rays_posy.end()) {
-	yoga_plus(pp->second->d_data,(tmp->deltay-deltay),pp->second->nb_elem);
+      pp = target->d_targets.at(dd)->yoff.find(make_pair("atmos",tmp->altitude));
+      if (pp != target->d_targets.at(dd)->yoff.end()) {
+	target->d_targets.at(dd)->yoff[make_pair("atmos",tmp->altitude)] += (tmp->deltay-deltay);
       }
     }
     p++;cpt++;
@@ -234,7 +234,7 @@ extern "C" {
       atmos_struct *handle=(atmos_struct *)ypush_obj(&yAtmos, sizeof(atmos_struct));
       handle->device = odevice;
       
-      handle->yoga_atmos = new yoga_atmos(nscreens,(float *)r0,(long *)size,(long *)size2,(float *)alt,(float *)wspeed,(float *)wdir,(float *)deltax,(float *)deltay,(float *)pupil);
+      handle->yoga_atmos = new yoga_atmos(nscreens,(float *)r0,(long *)size,(long *)size2,(float *)alt,(float *)wspeed,(float *)wdir,(float *)deltax,(float *)deltay,(float *)pupil,odevice);
       
     } catch ( string msg ) {
       y_error(msg.c_str());
@@ -516,7 +516,7 @@ extern "C" {
       target_struct *handle=(target_struct *)ypush_obj(&yTarget, sizeof(target_struct));
       handle->device = odevice;
       
-      handle->yoga_target = new yoga_target(ntargets,xpos,ypos,lambda,mag,sizes);
+      handle->yoga_target = new yoga_target(ntargets,xpos,ypos,lambda,mag,sizes,odevice);
       
     } catch ( string msg ) {
       y_error(msg.c_str());
@@ -545,14 +545,11 @@ extern "C" {
 
     float alt = ygets_f(argc-4);
 
-    float *xref = ygeta_f(argc-5, &ntot,dims);
-    if (ntot != target_handler->d_targets.at(ntarget)->npos)
-      y_error("wrong size for xref");
-    float *yref = ygeta_f(argc-6, &ntot,dims);
-    if (ntot != target_handler->d_targets.at(ntarget)->npos)
-      y_error("wrong size for yref");
+    float xoff = ygets_f(argc-5);
 
-    target_handler->d_targets.at(ntarget)->add_layer(type,alt,xref,yref,ntot);
+    float yoff = ygets_f(argc-6);
+
+    target_handler->d_targets.at(ntarget)->add_layer(type,alt,xoff,yoff);
   }
 
   void
@@ -691,20 +688,6 @@ extern "C" {
   }
 
   void
-  Y_phase_copy(int argc)
-  { 
-
-    phase_struct *handle1 = (phase_struct *)yget_obj(argc-1,&yPhase);
-    phase_struct *handle2 = (phase_struct *)yget_obj(argc-2,&yPhase);
-
-    yoga_phase *phase_handler1 = (yoga_phase *)handle1->yoga_phase;
-    yoga_phase *phase_handler2 = (yoga_phase *)handle2->yoga_phase;
-
-    phase_copy(phase_handler1,phase_handler2);
-
-  }
-
-  void
   Y_phase_set(int argc)
   { 
     long ntot;
@@ -795,7 +778,7 @@ __        _______ ____
       wfs_struct *handle=(wfs_struct *)ypush_obj(&yWfs, sizeof(wfs_struct));
       handle->device = odevice;
       
-      handle->yoga_wfs = new yoga_wfs(nxsub,nvalid,npix,nphase,nrebin,nfft,ntot,npup,pdiam,nphot,lgs);
+      handle->yoga_wfs = new yoga_wfs(nxsub,nvalid,npix,nphase,nrebin,nfft,ntot,npup,pdiam,nphot,lgs,odevice);
       
     } catch ( string msg ) {
       y_error(msg.c_str());
@@ -933,7 +916,7 @@ __        _______ ____
       sensors_struct *handle=(sensors_struct *)ypush_obj(&ySensors, sizeof(sensors_struct));
       handle->device = odevice;
       
-      handle->yoga_sensors = new yoga_sensors(nsensors,nxsub,nvalid,npix,nphase,nrebin,nfft,ntota,npup,pdiam,nphot,lgs);
+      handle->yoga_sensors = new yoga_sensors(nsensors,nxsub,nvalid,npix,nphase,nrebin,nfft,ntota,npup,pdiam,nphot,lgs,odevice);
       
     } catch ( string msg ) {
       y_error(msg.c_str());
@@ -998,14 +981,10 @@ __        _______ ____
 
     float alt = ygets_f(argc-4);
 
-    float *xref = ygeta_f(argc-5, &ntot,dims);
-    if (ntot != sensors_handler->d_wfs.at(nsensor)->d_gs->npos)
-      y_error("wrong size for xref");
-    float *yref = ygeta_f(argc-6, &ntot,dims);
-    if (ntot != sensors_handler->d_wfs.at(nsensor)->d_gs->npos)
-      y_error("wrong size for yref");
+    float xoff = ygets_f(argc-5);
+    float yoff = ygets_f(argc-6);
 
-    sensors_handler->d_wfs.at(nsensor)->d_gs->add_layer(type,alt,xref,yref,ntot);
+    sensors_handler->d_wfs.at(nsensor)->d_gs->add_layer(type,alt,xoff,yoff);
   }
 
   void
@@ -1022,13 +1001,18 @@ __        _______ ____
 
     int *phasemap = ygeta_i(argc-3, &ntot,dims);
     int *hrmap = ygeta_i(argc-4, &ntot,dims);
-    int *imamap = ygeta_i(argc-5, &ntot,dims);
-    int *binmap = ygeta_i(argc-6, &ntot,dims);
-    float *offsets = ygeta_f(argc-7, &ntot,dims);
-    float *pupil = ygeta_f(argc-8, &ntot,dims);
-    float *fluxPerSub = ygeta_f(argc-9, &ntot,dims);
+    int *binmap = ygeta_i(argc-5, &ntot,dims);
+    float *offsets = ygeta_f(argc-6, &ntot,dims);
+    float *pupil = ygeta_f(argc-7, &ntot,dims);
+    float *fluxPerSub = ygeta_f(argc-8, &ntot,dims);
+    int *isvalid = ygeta_i(argc-9, &ntot,dims);
+    int *validsubsx = ygeta_i(argc-10, &ntot,dims);
+    int *validsubsy = ygeta_i(argc-11, &ntot,dims);
+    int *istart = ygeta_i(argc-12, &ntot,dims);
+    int *jstart = ygeta_i(argc-13, &ntot,dims);
 
-    sensors_handler->d_wfs.at(nsensor)->wfs_initarrays(phasemap,hrmap,imamap,binmap,offsets,pupil,fluxPerSub);
+    sensors_handler->d_wfs.at(nsensor)->wfs_initarrays(phasemap,hrmap,binmap,offsets,pupil,
+						       fluxPerSub,isvalid,validsubsx,validsubsy,istart,jstart);
   }
 
   void
@@ -1045,7 +1029,58 @@ __        _______ ____
 
     float *kernels = ygeta_f(argc-3, &ntot,dims);
 
-    sensors_handler->d_wfs.at(nsensor)->load_kernels(kernels,handler->device);
+    sensors_handler->d_wfs.at(nsensor)->load_kernels(kernels);
+  }
+
+  void
+  Y_sensors_initlgs(int argc)
+  {    
+    long ntot;
+    long dims[Y_DIMSIZE];
+    sensors_struct *handler = (sensors_struct *)yget_obj(argc-1,&ySensors);
+    yoga_sensors *sensors_handler = (yoga_sensors *)(handler->yoga_sensors);
+
+    if (handler->device != activeDevice) yoga_setDevice(handler->device);
+
+    int nsensor = ygets_i(argc-2);
+
+    int nprof       = ygets_i(argc-3);
+    float hg        = ygets_f(argc-4);
+    float h0        = ygets_f(argc-5);
+    float deltah    = ygets_f(argc-6);
+    float pixsize   = ygets_f(argc-7);
+    float *doffaxis = ygeta_f(argc-8, &ntot,dims);
+    float *prof1d   = ygeta_f(argc-9, &ntot,dims);
+    float *profcum  = ygeta_f(argc-10, &ntot,dims);
+    float *beam     = ygeta_f(argc-11, &ntot,dims);
+    float *ftbeam   = ygeta_f(argc-12, &ntot,dims);
+    float *azimuth  = ygeta_f(argc-13, &ntot,dims);
+
+    sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->lgs_init(nprof,hg,h0,deltah,pixsize,doffaxis,prof1d,profcum,
+							      beam,(cuFloatComplex *)ftbeam,azimuth);
+    sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->lgs_update(handler->device);
+  }
+
+  void
+  Y_sensors_updatelgs(int argc)
+  {    
+    long ntot;
+    long dims[Y_DIMSIZE];
+    sensors_struct *handler = (sensors_struct *)yget_obj(argc-1,&ySensors);
+    yoga_sensors *sensors_handler = (yoga_sensors *)(handler->yoga_sensors);
+
+    if (handler->device != activeDevice) yoga_setDevice(handler->device);
+
+    int nsensor = ygets_i(argc-2);
+
+    float *prof1d   = ygeta_f(argc-3, &ntot,dims);
+    float *profcum  = ygeta_f(argc-4, &ntot,dims);
+    float hg        = ygets_f(argc-5);
+    float h0        = ygets_f(argc-6);
+    float deltah    = ygets_f(argc-7);
+
+    sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->load_prof(prof1d,profcum,hg,h0,deltah);
+    sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->lgs_update(handler->device);
   }
 
   void
@@ -1089,7 +1124,7 @@ __        _______ ____
 
     if (handler->device != activeDevice) yoga_setDevice(handler->device);
 
-    sensors_handler->d_wfs.at(nsensor)->comp_image(handler->device);
+    sensors_handler->d_wfs.at(nsensor)->comp_image();
   }
 
   void
@@ -1215,15 +1250,16 @@ __        _______ ____
       sensors_handler->d_wfs.at(nsensor)->d_totimg->device2host(data);
     }
     if (strcmp(type_data, "lgskern")==0) {
-      float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_lgskern->dims_data);
-      sensors_handler->d_wfs.at(nsensor)->d_lgskern->device2host(data);
+      float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->d_lgskern->dims_data);
+      sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->d_lgskern->device2host(data);
     }
     if (strcmp(type_data, "ftlgskern")==0) {
       long *ndims_data = new long[5];
       ndims_data[0]=4;ndims_data[1]=2;
-      memcpy(&ndims_data[2],&(sensors_handler->d_wfs.at(nsensor)->d_ftlgskern->getDims()[1]),sizeof(long)*3);
+      memcpy(&ndims_data[2],&(sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->d_ftlgskern->getDims()[1])
+	     ,sizeof(long)*3);
       float *data = ypush_f(ndims_data);
-      sensors_handler->d_wfs.at(nsensor)->d_ftlgskern->device2host((cuFloatComplex *)data);
+      sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->d_ftlgskern->device2host((cuFloatComplex *)data);
     }
     if (strcmp(type_data, "subsum")==0) {
       float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_subsum->dims_data);
@@ -1240,6 +1276,26 @@ __        _______ ____
     if (strcmp(type_data, "validi")==0) {
       int *data = ypush_i(sensors_handler->d_wfs.at(nsensor)->d_validindx->dims_data);
       sensors_handler->d_wfs.at(nsensor)->d_validindx->device2host(data);
+    }
+    if (strcmp(type_data, "offsets")==0) {
+      float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_offsets->dims_data);
+      sensors_handler->d_wfs.at(nsensor)->d_offsets->device2host(data);
+    }
+    if (strcmp(type_data, "prof1d")==0) {
+      float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->d_prof1d->dims_data);
+      sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->d_prof1d->device2host(data);
+    }
+    if (strcmp(type_data, "profcum")==0) {
+      float *data = ypush_f(sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->d_profcum->dims_data);
+      sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->d_profcum->device2host(data);
+    }
+    if (strcmp(type_data, "prof2d")==0) {
+      long *ndims_data = new long[4];
+      ndims_data[0]=3;ndims_data[1]=2;
+      memcpy(&ndims_data[2],&(sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->d_prof2d->getDims()[1])
+	     ,sizeof(long)*3);
+      float *data = ypush_f(ndims_data);
+      sensors_handler->d_wfs.at(nsensor)->d_gs->d_lgs->d_prof2d->device2host((cuFloatComplex *)data);
     }
 
   }

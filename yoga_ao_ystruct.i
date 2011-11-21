@@ -92,13 +92,14 @@ struct wfs_struct
                          // full FoV image (array of 0 if the same)
   pointer _binmap;       // array of pixels transform from full FoV hr images to
                          // binned images
-  pointer _imamap;       // array of pixels transform from subaps binned images to
-                         // total wfs image
   pointer _halfxy;       // phase offset for 1/2 pixel shift in (x,y)
-
-  pointer xprofbin;      // pixel transform from hr profile to binned profile
-  pointer deltaprofbin;  // pixel transform from hr profile to binned profile
+  
   pointer _lgskern;      // lgs kernels for each subap
+  pointer _prof1d;       // hr profile
+  pointer _profcum;      // hr profile cumulated
+  pointer _beam;         // 1d beam function
+  pointer _ftbeam;       // 1d beam function fft
+  pointer _azimuth;      // angles of rotation for each spot
 };
 
 struct loop_struct

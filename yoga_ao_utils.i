@@ -3,6 +3,17 @@ radeg = 1./dtor;
 
 RASC = 180*3600/pi;
 
+func regressAx(y,x)
+/* DOCUMENT coef = regressAx(y,x)
+   returns the regression coefficient A, when fitting
+   the data y by the function y=A.x
+   This function expects that (y=Ax+B with B=0). This makes the linear fit more
+   robust, since the regression line is constrained to go through (0,0).
+ */
+{
+  return sum(y*x)/sum(x*x);
+}
+
 func fft_goodsize(size)
   /* DOCUMENT func fft_goodsize(size)
      find best size for a fft (radix 2, 3, 5 or 7) from size
@@ -20,6 +31,90 @@ func fft_goodsize(size)
 
   return mradix^(long(log(size)/log(mradix))+1);
 }
+
+func rotate(im,ang,cx,cy,zoom)
+/* DOCUMENT imrot = rotate(im,ang,cx,cy,zoom)
+            imrot = rotate(im,ang)
+
+Rotates an image of an angle "ang" (in DEGREES).
+The center of rotation is cx,cy.
+A zoom factor can be applied.
+
+(cx,cy) can be omitted :one will assume one rotates around the
+center of the image.
+If zoom is not specified, the default value of 1.0 is taken.
+
+modif dg : allow to rotate a cube of images with one angle per image
+
+ */
+{
+  if( is_void(zoom) ) zoom=1.0;
+  if( zoom==0.0 ) zoom=1.0;
+  if (numberof(ang) == 1)
+    if(ang==0 & zoom==1.0) return im;
+  
+  ang *= pi/180.0;
+  s = dimsof(im);
+  nx = s(2);
+  ny = s(3);
+  if( is_void(cx) )
+    cx = nx/2 + 1;
+  if( is_void(cy) )
+    cy = ny/2 + 1;
+  x = indgen(1:nx)(,-:1:ny) - cx;
+  y = indgen(1:ny)(-:1:nx,) - cy;
+  x /= zoom;
+  y /= zoom;
+  
+  if (numberof(ang)>1) {
+    rxy = array(0.,nx,ny,2,numberof(ang));
+    for (i=1;i<=numberof(ang);i++) {
+      matrot = [[cos(ang(i)),-sin(ang(i))],[sin(ang(i)),cos(ang(i))]];
+      rxy(,,,i) = [x,y](,,+) * matrot(,+) + [cx,cy](-,-,);
+    }
+  } else {
+    matrot = [[cos(ang),-sin(ang)],[sin(ang),cos(ang)]];
+    rxy = [x,y](,,+) * matrot(,+) + [cx,cy](-,-,);
+  }
+  
+  nn = where(rxy<1);
+  if( is_array(nn) )
+    rxy(nn)=1.;
+  
+  if (numberof(ang) > 1) {
+    rx = rxy(,,1,);
+    ry = rxy(,,2,);
+  } else {
+    rx = rxy(,,1);
+    ry = rxy(,,2);
+  }
+  nn = where(rx>(nx-1));
+  if( is_array(nn) )
+    rx(nn)=nx-1;
+  nn = where(ry>(ny-1));
+  if( is_array(nn) )
+    ry(nn)=ny-1;
+
+  wx = rx;
+  wy = ry;
+  rx = long(rx);   // partie entiere
+  ry = long(ry);
+  wx -= rx;        // partie fractionnaire
+  wy -= ry;
+
+  ind = rx + (ry-1)*nx;
+  
+  if (numberof(ang) > 1) {
+    nim = indgen(numberof(ang))-1;
+    nim *= (nx*ny);
+    nim = nim(-:1:nx,-:1:ny,);
+    ind += nim;
+  }
+  
+  imr = (im(ind)*(1-wx) + im(ind+1)*wx)*(1-wy) + (im(ind+nx)*(1-wx)+im(ind+nx+1)*wx)*wy;
+  return imr;
+}
+
 
 func fft_rotate(im,angle,xc=,yc=,gband=)
 /* DOCUMENT fft_rotate(im,angle)
@@ -51,13 +146,16 @@ func fft_rotate(im,angle,xc=,yc=,gband=)
 
   if (gband != 0) {
     im2=array(double,2*nx,2*nx);
-    im2(nx-nx/2:nx+nx/2,nx-nx/2:nx+nx/2) = im;
+    if (nx %2 == 0)
+      im2(nx-nx/2+1:nx+nx/2,nx-nx/2+1:nx+nx/2) = im;
+    else
+      im2(nx-nx/2:nx+nx/2,nx-nx/2:nx+nx/2) = im;      
     im = im2;
     nx *= 2;
   }
   
-  if (xc == []) xc = ((nx/2)%2 == 0 ? nx/2+0.5 : nx/2);
-  if (yc == []) yc = ((nx/2)%2 == 0 ? nx/2+0.5 : nx/2-1);
+  if (xc == []) xc = ((nx/2)%2 == 0 ? nx/2+1 : nx/2);
+  if (yc == []) yc = ((nx/2)%2 == 0 ? nx/2+1 : nx/2);
 
   theta = angle * pi/180.;
   
@@ -67,13 +165,13 @@ func fft_rotate(im,angle,xc=,yc=,gband=)
   stepx = tan(theta/2);
   stepy = -1.*sin(theta);
 
-  // if (nx/2%2) {
-  tiltx = -2.*pi/nx*(float(stepx)*(indgen(nx)-nx/2-0.5));
-  tilty = -2.*pi/nx*(float(stepy)*(indgen(nx)-nx/2-0.5));
-    //  } else {
-  //tiltx = -2.*pi/nx*(float(stepx)*(indgen(nx)-nx/2-1));
-  //tilty = -2.*pi/nx*(float(stepy)*(indgen(nx)-nx/2-1));
-    //  }
+  if ((nx/2)%2 == 0) {
+    tiltx = -2.*pi/nx*(float(stepx)*(indgen(nx)-nx/2-0.5));
+    tilty = -2.*pi/nx*(float(stepy)*(indgen(nx)-nx/2-0.5));
+  } else {
+    tiltx = -2.*pi/nx*(float(stepx)*(indgen(nx)-nx/2-1));
+    tilty = -2.*pi/nx*(float(stepy)*(indgen(nx)-nx/2-1));
+  }
   
   compltiltx=array(complex,nx);
   compltiltx.im=roll(tiltx);
@@ -98,7 +196,10 @@ func fft_rotate(im,angle,xc=,yc=,gband=)
     if (angle < -90) {
       return fft_rotate(tmpc.re/nx/nx/nx,angle+90.,gband=0);
     } else {
-      return tmpc(nx/2-nx/4:nx/2+nx/4,nx/2-nx/4:nx/2+nx/4).re/nx/nx/nx;
+      if ((nx/2)%2 == 0)
+        return tmpc(nx/2-nx/4+1:nx/2+nx/4,nx/2-nx/4+1:nx/2+nx/4).re/nx/nx/nx;
+      else
+        return tmpc(nx/2-nx/4:nx/2+nx/4,nx/2-nx/4:nx/2+nx/4).re/nx/nx/nx;
     }
   }
 }

@@ -121,6 +121,8 @@ func atmos_init(void)
   else {
     if (y_target != [])
       max_size = max(abs(*y_target.xpos,*y_target.ypos));
+    else if (y_wfs != [])
+      max_size = max(abs(y_wfs.xpos,y_wfs.ypos));
     else max_size = 0.;
   }
   
@@ -172,12 +174,18 @@ func wfs_init(void)
       init_wfs_geom,i;
     }
   }
-  g_wfs = yoga_sensors(numberof(y_wfs),y_wfs.nxsub,y_wfs._nvalid,y_wfs.npix,y_wfs._pdiam,y_wfs._nrebin,y_wfs._Nfft,y_wfs._Ntot,y_geom._n,y_wfs._subapd,y_wfs._nphotons,y_wfs.gsalt > 0);
+  g_wfs = yoga_sensors(numberof(y_wfs),y_wfs.nxsub,y_wfs._nvalid,y_wfs.npix,y_wfs._pdiam,
+                       y_wfs._nrebin,y_wfs._Nfft,y_wfs._Ntot,y_geom._n,y_wfs._subapd,
+                       y_wfs._nphotons,y_wfs.gsalt > 0);
   
-  sensors_initgs,g_wfs,y_wfs.xpos,y_wfs.ypos,y_wfs.lambda,y_wfs.gsmag,(y_geom._n)(-::numberof(y_wfs)-1),y_wfs.noise;
+  sensors_initgs,g_wfs,y_wfs.xpos,y_wfs.ypos,y_wfs.lambda,y_wfs.gsmag,
+    (y_geom._n)(-::numberof(y_wfs)-1),y_wfs.noise;
   
   for (i=1;i<=numberof(y_wfs);i++) {
-    sensors_initarr,g_wfs,i-1,int(*y_wfs(i)._phasemap),int(*y_wfs(i)._hrmap),int(*y_wfs(i)._imamap),int(*y_wfs(i)._binmap),complex(*y_wfs(i)._halfxy),float(*y_geom._mpupil),(*y_wfs(1)._fluxPerSub)(where(*y_wfs(1)._isvalid));
+    sensors_initarr,g_wfs,i-1,int(*y_wfs(i)._phasemap),int(*y_wfs(i)._hrmap),
+      int(*y_wfs(i)._binmap),float(*y_wfs(i)._halfxy),float(*y_geom._mpupil),
+      (*y_wfs(i)._fluxPerSub)(where(*y_wfs(i)._isvalid)),int(*y_wfs(i)._isvalid),
+      int((*y_wfs(i)._validsubs)(1,)-1),int((*y_wfs(i)._validsubs)(2,)-1),int(*y_wfs(i)._istart+1),int(*y_wfs(i)._jstart+1);
   }
 
   // lgs case
@@ -193,8 +201,7 @@ func wfs_init(void)
       h    = prof(,1);
       prof = prof(,2:)(,avg);
       prep_lgs_prof,cc,prof,h,y_wfs(cc).beamsize;
-      "lgs mode";
-      sensors_loadkernels,g_wfs,cc-1,float(*y_wfs(cc)._lgskern);
+      //sensors_loadkernels,g_wfs,cc-1,float(*y_wfs(cc)._lgskern);
     }
   }
 }
@@ -227,53 +234,30 @@ func target_init(void)
     
     g_target = yoga_target(y_target.ntargets,*y_target.xpos,*y_target.ypos,*y_target.lambda,*y_target.mag,sizes);
 
-    /*
-      These are the positions of the intercepts of each ray of the pupil whith each layer
-      and in each target direction. now what happens in the simulation is the following :
-      add deltax & deltay to these ref positions
-      if tmp = long(ref+deltax)-long(ref) > 1
-      extrude(tmp)
-      ref += deltax-tmp
-      else ref += deltax
-      raytrace(ref)
-    */
-
-  // zero-centered vector of position (our reference)
-    xref = indgen(y_geom.pupdiam)-1+2; // starting @ 0, C-like +2 because _n-_p = 4
-    yref = indgen(y_geom.pupdiam)-1+2; // starting @ 0, C-like
-    xref = float(xref(,-::y_atmos.nscreens-1,-::y_target.ntargets-1));
-    yref = float(yref(,-::y_atmos.nscreens-1,-::y_target.ntargets-1));
-    
     for (cc=1;cc<=y_target.ntargets;cc++) {
       for (dd=1;dd<=y_atmos.nscreens;dd++) {
         xoff = (*y_target.xpos)(cc)*4.848e-6*(*y_atmos.alt)(dd)/y_atmos.pupixsize;
         yoff = (*y_target.ypos)(cc)*4.848e-6*(*y_atmos.alt)(dd)/y_atmos.pupixsize;
-        xref(,dd,cc) += float(xoff+((*y_atmos.dim_screens)(dd)-y_geom._n)/2);
-        yref(,dd,cc) += float(yoff+((*y_atmos.dim_screens)(dd)-y_geom._n)/2);
-        target_addlayer,g_target,cc-1,type,(*y_atmos.alt)(dd),xref(,dd,cc),yref(,dd,cc);
+        xoff = float(xoff+((*y_atmos.dim_screens)(dd)-y_geom._n)/2);
+        yoff = float(yoff+((*y_atmos.dim_screens)(dd)-y_geom._n)/2);
+        target_addlayer,g_target,cc-1,type,(*y_atmos.alt)(dd),xoff,yoff;
       }
     }
   }
   
   if (y_wfs != []) {
-    xref = indgen(y_geom._n)-1; // starting @ 0, C-like 
-    yref = indgen(y_geom._n)-1; // starting @ 0, C-like
-    xref = float(xref(,-::y_atmos.nscreens-1,-::numberof(y_wfs)-1));
-    yref = float(yref(,-::y_atmos.nscreens-1,-::numberof(y_wfs)-1));
-    
     if ((y_wfs != []) && (g_wfs != [])) {
       for (cc=1;cc<=numberof(y_wfs);cc++) {
         for (dd=1;dd<=y_atmos.nscreens;dd++) {
           xoff = (y_wfs.xpos)(cc)*4.848e-6*(*y_atmos.alt)(dd)/y_atmos.pupixsize;
           yoff = (y_wfs.ypos)(cc)*4.848e-6*(*y_atmos.alt)(dd)/y_atmos.pupixsize;
-          xref(,dd,cc) += float(xoff+((*y_atmos.dim_screens)(dd)-y_geom._n)/2);
-          yref(,dd,cc) += float(yoff+((*y_atmos.dim_screens)(dd)-y_geom._n)/2);
-          sensors_addlayer,g_wfs,cc-1,type,(*y_atmos.alt)(dd),xref(,dd,cc),yref(,dd,cc);
+          xoff = float(xoff+((*y_atmos.dim_screens)(dd)-y_geom._n)/2);
+          yoff = float(yoff+((*y_atmos.dim_screens)(dd)-y_geom._n)/2);
+          sensors_addlayer,g_wfs,cc-1,type,(*y_atmos.alt)(dd),xoff,yoff;
         }
       }
     }
   }
-  
 }
 
 

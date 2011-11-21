@@ -13,7 +13,7 @@
                                                                              
  */
 
-yoga_tscreen::yoga_tscreen(long size, long size2, float r0, float altitude, float windspeed, float winddir,float deltax, float deltay)
+yoga_tscreen::yoga_tscreen(long size, long size2, float r0, float altitude, float windspeed, float winddir,float deltax, float deltay, int device)
 {
   this->screen_size = size;
   this->amplitude   = pow(r0,-5./6);
@@ -24,8 +24,10 @@ yoga_tscreen::yoga_tscreen(long size, long size2, float r0, float altitude, floa
   this->accumy      = 0.0f;
   this->deltax      = deltax;
   this->deltay      = deltay;
+  this->device      = device;
  
   this->d_tscreen = new yoga_phase(this->screen_size);
+  this->channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
 
   long *dims_data2 = new long[3];
   dims_data2[0] = 2; dims_data2[1] = this->screen_size; dims_data2[2] = this->screen_size; 
@@ -82,14 +84,16 @@ int yoga_tscreen::extrude(int dir)
   NC = screen_size;
 
   if (dir == 1) {// adding a column to the left
-    fillindex(this->d_z->d_data,this->d_tscreen->d_screen->d_data,(int *)this->d_istencilx->d_data,this->d_z->nb_elem);
+    fillindx(this->d_z->d_data,this->d_tscreen->d_screen->d_data,(int *)this->d_istencilx->d_data,
+	     this->d_z->nb_elem,this->device);
     x0 = this->screen_size - 1;//not in stencil
   } else {
-    fillindex(this->d_z->d_data,this->d_tscreen->d_screen->d_data,(int *)this->d_istencily->d_data,this->d_z->nb_elem);
+    fillindx(this->d_z->d_data,this->d_tscreen->d_screen->d_data,(int *)this->d_istencily->d_data,
+	     this->d_z->nb_elem,this->device);
     x0 = this->screen_size*(this->screen_size-1);
   }
 
-  yoga_plusai(this->d_z->d_data,this->d_tscreen->d_screen->d_data,x0,-1.0f,this->d_z->nb_elem);
+  addai(this->d_z->d_data,this->d_tscreen->d_screen->d_data,x0,-1.0f,this->d_z->nb_elem,this->device);
 
   this->d_ytmp->gemv('n',1.0f,this->d_A,this->d_A->dims_data[1],this->d_z,1,0.0f,1);
 
@@ -97,7 +101,7 @@ int yoga_tscreen::extrude(int dir)
 
   this->d_ytmp->gemv('n',this->amplitude,this->d_B,this->d_B->dims_data[1],this->d_noise,1,1.0f,1);
 
-  yoga_plusai(this->d_ytmp->d_data,this->d_tscreen->d_screen->d_data,x0,1.0f,this->d_ytmp->nb_elem);
+  addai(this->d_ytmp->d_data,this->d_tscreen->d_screen->d_data,x0,1.0f,this->d_ytmp->nb_elem,this->device);
 
   if (dir == 1) {
     x0 = 1;
@@ -109,12 +113,12 @@ int yoga_tscreen::extrude(int dir)
     N = this->screen_size* (this->screen_size - 1);
   }
 
-  getarray2d(this->d_tscreen_o->d_data,this->d_tscreen->d_screen->d_data, x0,Ncol, NC, N);
+  getarr2d(this->d_tscreen_o->d_data,this->d_tscreen->d_screen->d_data, x0,Ncol, NC, N, this->device);
   
   if (dir == 1) x0 = 0;
   else x0 = 0;
 
-  fillarray2d(this->d_tscreen->d_screen->d_data, this->d_tscreen_o->d_data, x0, Ncol, NC, N);
+  fillarr2d(this->d_tscreen->d_screen->d_data, this->d_tscreen_o->d_data, x0, Ncol, NC, N, this->device);
   
   if (dir == 1) {
     x0 = this->screen_size-1;
@@ -126,7 +130,7 @@ int yoga_tscreen::extrude(int dir)
     N = this->screen_size;
   }
 
-  fillarray2d(this->d_tscreen->d_screen->d_data, this->d_ytmp->d_data, x0, Ncol, NC, N);
+  fillarr2d(this->d_tscreen->d_screen->d_data, this->d_ytmp->d_data, x0, Ncol, NC, N, this->device);
 
   return EXIT_SUCCESS;
 }
@@ -141,13 +145,13 @@ int yoga_tscreen::extrude(int dir)
                                                                              
  */
 
-yoga_atmos::yoga_atmos(int nscreens,float *r0,long *size,long *size2, float *altitude, float *windspeed, float *winddir, float *deltax, float *deltay, float *pupil)
+yoga_atmos::yoga_atmos(int nscreens,float *r0,long *size,long *size2, float *altitude, float *windspeed, float *winddir, float *deltax, float *deltay, float *pupil, int device)
 {
   this->nscreens = nscreens;
   //this->r0       = r0;
 
   for (int i=0;i<nscreens;i++) {
-    d_screens.insert(pair<float,yoga_tscreen *>(altitude[i],new yoga_tscreen(size[i],size2[i],r0[i],altitude[i],windspeed[i],winddir[i],deltax[i],deltay[i])));
+    d_screens.insert(pair<float,yoga_tscreen *>(altitude[i],new yoga_tscreen(size[i],size2[i],r0[i],altitude[i],windspeed[i],winddir[i],deltax[i],deltay[i],device)));
   }
 
   if (d_screens.find(0.0f) != d_screens.end()) {
